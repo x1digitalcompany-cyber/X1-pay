@@ -69,6 +69,15 @@ export function StepPagamento({
     }`
   }
 
+  async function handleSubmit() {
+    const cpfDigits = data.customerCpf?.replace(/\D/g, '') || ''
+    if (cpfDigits.length !== 11 && cpfDigits.length !== 14) {
+      toast.error('Informe um CPF ou CNPJ válido para continuar')
+      return
+    }
+    await onSubmit()
+  }
+
   async function copyPix() {
     if (result?.pixCode) {
       await navigator.clipboard.writeText(result.pixCode)
@@ -359,7 +368,7 @@ export function StepPagamento({
       {/* Botão confirmar */}
       <button
         type="button"
-        onClick={onSubmit}
+        onClick={handleSubmit}
         disabled={loading}
         className="w-full py-3.5 rounded-xl bg-green-500 hover:bg-green-600 text-white font-semibold text-sm transition flex items-center justify-center gap-2 disabled:opacity-50"
       >

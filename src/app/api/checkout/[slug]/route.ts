@@ -200,17 +200,29 @@ export async function POST(
           },
         })
       } else if (body.card) {
+        const billingLine1 = [body.number, body.street, body.neighborhood]
+          .filter(Boolean)
+          .join(', ')
+          .slice(0, 60)
+
         payments.push({
           payment_method: 'credit_card',
           credit_card: {
             installments,
-            statement_descriptor: user.brandName.slice(0, 13),
+            statement_descriptor: (user.brandName || 'X1PAY').slice(0, 13),
             card: {
               number: body.card.number.replace(/\D/g, ''),
               holder_name: body.card.holderName,
               exp_month: parseInt(body.card.expMonth, 10),
               exp_year: normalizeExpYear(body.card.expYear),
               cvv: body.card.cvv,
+              billing_address: {
+                line_1: billingLine1 || 'Endereço não informado',
+                zip_code: (body.zipCode || '').replace(/\D/g, ''),
+                city: body.city || 'Cidade',
+                state: (body.state || 'SP').slice(0, 2).toUpperCase(),
+                country: 'BR',
+              },
             },
           },
         })
@@ -292,14 +304,33 @@ export async function POST(
         console.log('[BOLETO DEBUG] lastTransaction keys:', Object.keys(lastTransaction ?? {}))
         console.log('[BOLETO DEBUG] pagarmeOrder keys:', Object.keys(pagarmeOrder ?? {}))
       }
-      if (paymentMethod === 'CARD' && lastTransaction?.card) {
-        updateData.cardBrand = lastTransaction.card.brand
-        updateData.cardLastDigits = lastTransaction.card.last_four_digits
-        if (charge?.status === 'paid') {
-          await prisma.order.update({
-            where: { id: order.id },
-            data: { status: 'PAID', paidAt: new Date() },
-          })
+      if (paymentMethod === 'CARD') {
+        if (charge?.status === 'failed' || lastTransaction?.status === 'failed') {
+          await prisma.order.update({ where: { id: order.id }, data: { status: 'CANCELLED' } })
+
+          const gwError: string =
+            (lastTransaction as Record<string, unknown>)?.gateway_response
+              ? ((lastTransaction as Record<string, Record<string, Array<Record<string, string>>>>)
+                  .gateway_response?.errors?.[0]?.message ?? '')
+              : ''
+
+          let userMessage = 'Pagamento recusado. Verifique os dados do cartão e tente novamente.'
+          if (gwError.includes('billing')) userMessage = 'Erro nos dados de endereço. Verifique o CEP e tente novamente.'
+          else if (gwError.includes('card')) userMessage = 'Cartão inválido. Verifique o número, validade e CVV.'
+          else if (gwError.includes('insufficient')) userMessage = 'Saldo insuficiente. Tente outro cartão.'
+
+          return NextResponse.json({ error: userMessage }, { status: 422 })
+        }
+
+        if (lastTransaction?.card) {
+          updateData.cardBrand = lastTransaction.card.brand
+          updateData.cardLastDigits = lastTransaction.card.last_four_digits
+          if (charge?.status === 'paid') {
+            await prisma.order.update({
+              where: { id: order.id },
+              data: { status: 'PAID', paidAt: new Date() },
+            })
+          }
         }
       }
 

@@ -42,6 +42,14 @@ export interface CreateOrderParams {
         exp_month: number
         exp_year: number
         cvv: string
+        billing_address: {
+          line_1: string
+          line_2?: string
+          zip_code: string
+          city: string
+          state: string
+          country: string
+        }
       }
     }
     pix?: {
