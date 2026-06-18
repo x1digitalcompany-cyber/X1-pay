@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { formatCurrency, maskCpf } from '@/lib/utils'
-import { CreditCard, QrCode, Barcode, Check, Copy, X } from 'lucide-react'
+import { CreditCard, QrCode, Barcode, Check, Copy } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface AppliedCoupon {
@@ -18,9 +18,10 @@ interface StepPagamentoProps {
   maxInstallments: number
   brandColor: string
   data: {
+    customerName: string
+    customerCpf: string
     paymentMethod: 'PIX' | 'CARD' | 'BOLETO'
     installments: number
-    customerCpf: string
     card: {
       number: string
       holderName: string
@@ -44,6 +45,45 @@ interface StepPagamentoProps {
     status?: string
   } | null
 }
+
+// ── Helpers de validação ────────────────────────────────────────────────────
+
+function validarCPF(cpf: string): boolean {
+  const c = cpf.replace(/\D/g, '')
+  if (c.length !== 11) return false
+  if (/^(\d)\1{10}$/.test(c)) return false
+
+  let sum = 0
+  for (let i = 0; i < 9; i++) sum += parseInt(c[i]) * (10 - i)
+  let rev = 11 - (sum % 11)
+  if (rev === 10 || rev === 11) rev = 0
+  if (rev !== parseInt(c[9])) return false
+
+  sum = 0
+  for (let i = 0; i < 10; i++) sum += parseInt(c[i]) * (11 - i)
+  rev = 11 - (sum % 11)
+  if (rev === 10 || rev === 11) rev = 0
+  return rev === parseInt(c[10])
+}
+
+function normalizarNome(nome: string): string {
+  return nome
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z\s]/g, '')
+    .trim()
+    .replace(/\s+/g, ' ')
+}
+
+function nomesCompativeis(nomeCliente: string, nomeTitular: string): boolean {
+  const cliente = normalizarNome(nomeCliente).split(' ')
+  const titular = normalizarNome(nomeTitular).split(' ')
+  const matches = cliente.filter((p) => p.length > 2 && titular.includes(p))
+  return matches.length >= 2
+}
+
+// ── Componente ───────────────────────────────────────────────────────────────
 
 export function StepPagamento({
   price,
@@ -69,15 +109,77 @@ export function StepPagamento({
     }`
   }
 
+  // ── Validação e submit ────────────────────────────────────────────────────
   async function handleSubmit() {
+    // CPF / CNPJ
     const cpfDigits = data.customerCpf?.replace(/\D/g, '') || ''
-    if (cpfDigits.length !== 11 && cpfDigits.length !== 14) {
-      toast.error('Informe um CPF ou CNPJ válido para continuar')
+    if (cpfDigits.length === 0) {
+      toast.error('Informe seu CPF ou CNPJ para continuar.')
       return
     }
+    if (cpfDigits.length !== 11 && cpfDigits.length !== 14) {
+      toast.error('CPF deve ter 11 dígitos ou CNPJ 14 dígitos.')
+      return
+    }
+    if (cpfDigits.length === 11 && !validarCPF(cpfDigits)) {
+      toast.error('CPF inválido. Verifique e tente novamente.')
+      return
+    }
+
+    // Validações específicas do cartão
+    if (data.paymentMethod === 'CARD') {
+      const cardDigits = data.card.number.replace(/\D/g, '')
+      if (cardDigits.length < 13 || cardDigits.length > 19) {
+        toast.error('Número do cartão inválido.')
+        return
+      }
+
+      if (!data.card.holderName || data.card.holderName.trim().split(' ').filter(Boolean).length < 2) {
+        toast.error('Informe o nome completo como está impresso no cartão.')
+        return
+      }
+
+      const month = parseInt(data.card.expMonth, 10)
+      const year = parseInt(
+        data.card.expYear.length === 2 ? `20${data.card.expYear}` : data.card.expYear,
+        10
+      )
+      const now = new Date()
+      if (!month || month < 1 || month > 12) {
+        toast.error('Mês de validade inválido.')
+        return
+      }
+      if (!year || year < now.getFullYear()) {
+        toast.error('Cartão vencido. Use outro cartão.')
+        return
+      }
+      if (year === now.getFullYear() && month < now.getMonth() + 1) {
+        toast.error('Cartão vencido. Use outro cartão.')
+        return
+      }
+
+      if (!data.card.cvv || data.card.cvv.length < 3) {
+        toast.error('CVV inválido.')
+        return
+      }
+
+      // Aviso de nome divergente (não bloqueia)
+      if (
+        data.customerName &&
+        data.card.holderName &&
+        !nomesCompativeis(data.customerName, data.card.holderName)
+      ) {
+        toast.error(
+          '⚠️ O nome no cartão não corresponde ao nome informado. Use um cartão em seu próprio nome para evitar bloqueio por segurança.',
+          { duration: 6000 }
+        )
+      }
+    }
+
     await onSubmit()
   }
 
+  // ── Copy PIX ──────────────────────────────────────────────────────────────
   async function copyPix() {
     if (result?.pixCode) {
       await navigator.clipboard.writeText(result.pixCode)
@@ -87,7 +189,7 @@ export function StepPagamento({
     }
   }
 
-  // ── Tela de Resultado ────────────────────────────────────────────────────
+  // ── Tela de Resultado ─────────────────────────────────────────────────────
   if (result) {
     const isPaid = result.status === 'PAID'
 
@@ -98,9 +200,7 @@ export function StepPagamento({
             <Check size={28} className="text-green-500" strokeWidth={3} />
           </div>
           <h2 className="text-2xl font-bold text-gray-900">Pagamento confirmado!</h2>
-          <p className="text-sm text-gray-500">
-            Recebemos seu pagamento. Obrigado pela compra!
-          </p>
+          <p className="text-sm text-gray-500">Recebemos seu pagamento. Obrigado pela compra!</p>
           <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 text-sm text-amber-700 text-left">
             📦 Seu produto já está sendo separado e despachado — em breve chegará até você!
           </div>
@@ -177,16 +277,20 @@ export function StepPagamento({
     )
   }
 
-  // ── Formulário ───────────────────────────────────────────────────────────
+  // ── Formulário ────────────────────────────────────────────────────────────
   const cardNum = data.card.number.replace(/\s/g, '')
-  const cardDisplay = cardNum
-    ? cardNum.replace(/(.{4})/g, '$1 ').trim()
-    : '#### #### #### ####'
+  const cardDisplay = cardNum ? cardNum.replace(/(.{4})/g, '$1 ').trim() : '#### #### #### ####'
 
   const expDisplay =
     data.card.expMonth && data.card.expYear
       ? `${data.card.expMonth.padStart(2, '0')}/${data.card.expYear.slice(-2)}`
       : 'MM/AA'
+
+  const nomesDivergem =
+    data.paymentMethod === 'CARD' &&
+    data.card.holderName.trim().length > 3 &&
+    !!data.customerName &&
+    !nomesCompativeis(data.customerName, data.card.holderName)
 
   return (
     <div className="space-y-5">
@@ -258,6 +362,11 @@ export function StepPagamento({
                   onChange('card', { ...data.card, holderName: e.target.value.toUpperCase() })
                 }
               />
+              {nomesDivergem && (
+                <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                  ⚠️ O nome não corresponde ao nome informado no cadastro. Use o cartão em seu próprio nome.
+                </p>
+              )}
             </div>
 
             {/* Validade + CVV */}
@@ -385,7 +494,6 @@ export function StepPagamento({
         )}
       </button>
 
-      {/* Remover cupom aplicado (caso exista — vem da sidebar mas exibe aqui também) */}
       {appliedCoupon && (
         <div className="flex items-center justify-between text-xs text-green-600 bg-green-50 rounded-lg px-3 py-2">
           <span className="font-medium">{appliedCoupon.code} aplicado</span>
@@ -395,6 +503,3 @@ export function StepPagamento({
     </div>
   )
 }
-
-// Suprimir avisos de props não usadas na tela de resultado
-void (X as unknown)
