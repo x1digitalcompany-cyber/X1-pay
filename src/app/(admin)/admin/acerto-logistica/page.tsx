@@ -18,6 +18,8 @@ interface OrderRow {
   trackingCode: string | null
   sellerName: string | null
   productName: string | null
+  logisticPaid: boolean
+  logisticPaidAmount: number
 }
 
 interface Summary {
@@ -27,6 +29,8 @@ interface Summary {
   totalLogisticsCost: number
   totalNet: number
   totalMargin: number
+  totalLogisticPaid: number
+  pendingLogisticCost: number
 }
 
 const today = new Date()
@@ -89,6 +93,8 @@ export default function AcertoLogisticaPage() {
         { label: 'Receita bruta', value: formatCurrency(summary.totalRevenue), icon: DollarSign, color: 'text-green-400' },
         { label: 'Custo logística', value: formatCurrency(summary.totalLogisticsCost), icon: TrendingDown, color: 'text-red-400' },
         { label: 'Margem líquida', value: formatCurrency(summary.totalMargin), icon: TrendingUp, color: 'text-purple-400' },
+        { label: 'Total pago à logística', value: formatCurrency(summary.totalLogisticPaid), icon: DollarSign, color: 'text-emerald-400' },
+        { label: 'Custo pendente', value: formatCurrency(summary.pendingLogisticCost), icon: TrendingDown, color: 'text-yellow-400' },
       ]
     : []
 
@@ -127,7 +133,7 @@ export default function AcertoLogisticaPage() {
       </div>
 
       {summary && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           {cards.map((card) => (
             <div key={card.label} className="bg-[#1a1030] rounded-xl border border-purple-900/30 p-4">
               <div className="flex items-center justify-between mb-2">
@@ -158,6 +164,7 @@ export default function AcertoLogisticaPage() {
                   <th className="text-right p-3">Desconto</th>
                   <th className="text-right p-3">Liq. gateway</th>
                   <th className="text-right p-3">Custo logística</th>
+                  <th className="text-center p-3">Pago?</th>
                   <th className="text-right p-3">Margem</th>
                   <th className="text-left p-3">Rastreio</th>
                 </tr>
@@ -181,6 +188,13 @@ export default function AcertoLogisticaPage() {
                       <td className="p-3 text-right text-orange-400">
                         {o.logisticsCost > 0 ? formatCurrency(o.logisticsCost) : '—'}
                       </td>
+                      <td className="p-3 text-center">
+                        {o.logisticPaid ? (
+                          <span className="text-xs px-2 py-0.5 rounded bg-green-900/40 text-green-400">Sim</span>
+                        ) : (
+                          <span className="text-xs px-2 py-0.5 rounded bg-yellow-900/40 text-yellow-400">Não</span>
+                        )}
+                      </td>
                       <td className={`p-3 text-right font-medium ${margin >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                         {formatCurrency(margin)}
                       </td>
@@ -192,7 +206,7 @@ export default function AcertoLogisticaPage() {
                 })}
                 {orders.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="p-12 text-center text-gray-500">
+                    <td colSpan={11} className="p-12 text-center text-gray-500">
                       Nenhum pedido pago no período selecionado
                     </td>
                   </tr>
@@ -216,6 +230,7 @@ export default function AcertoLogisticaPage() {
                     <td className="p-3 text-right text-orange-400 font-semibold">
                       {formatCurrency(summary.totalLogisticsCost)}
                     </td>
+                    <td />
                     <td className={`p-3 text-right font-bold ${summary.totalMargin >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                       {formatCurrency(summary.totalMargin)}
                     </td>

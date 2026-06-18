@@ -2,6 +2,7 @@
 import { maskCpf, maskPhone } from '@/lib/utils'
 
 interface StepDadosPessoaisProps {
+  checkoutSlug: string
   data: {
     customerName: string
     customerEmail: string
@@ -12,9 +13,21 @@ interface StepDadosPessoaisProps {
   onNext: () => void
 }
 
-export function StepDadosPessoais({ data, onChange, onNext }: StepDadosPessoaisProps) {
-  function handleSubmit(e: React.FormEvent) {
+export function StepDadosPessoais({ checkoutSlug, data, onChange, onNext }: StepDadosPessoaisProps) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (data.customerName && (data.customerEmail || data.customerPhone)) {
+      fetch('/api/carrinho-abandonado', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          checkoutSlug,
+          name: data.customerName,
+          email: data.customerEmail,
+          phone: data.customerPhone,
+        }),
+      }).catch(() => {})
+    }
     onNext()
   }
 

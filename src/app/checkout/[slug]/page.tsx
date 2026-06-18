@@ -166,6 +166,7 @@ export default function CheckoutPage() {
           <div className="bg-white rounded-2xl border border-gray-100 p-6">
             {step === 1 && (
               <StepDadosPessoais
+                checkoutSlug={slug}
                 data={form}
                 onChange={updateForm}
                 onNext={() => setStep(2)}

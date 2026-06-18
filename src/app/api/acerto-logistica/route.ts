@@ -36,21 +36,30 @@ export async function GET(req: NextRequest) {
     orderBy: { paidAt: 'desc' },
   })
 
-  const rows = orders.map((o) => ({
-    id: o.id,
-    createdAt: o.createdAt,
-    paidAt: o.paidAt,
-    offerName: o.offerName,
-    customerName: o.customerName,
-    paymentMethod: o.paymentMethod,
-    value: o.value,
-    discountAmount: o.discountAmount,
-    netValue: o.netValue,
-    logisticsCost: o.checkout?.product?.unitCost ?? 0,
-    trackingCode: o.trackingCode,
-    sellerName: o.seller?.name ?? null,
-    productName: o.checkout?.product?.name ?? null,
-  }))
+  const rows = await Promise.all(
+    orders.map(async (o) => {
+      const logisticPaid = await prisma.logisticPayment.findFirst({
+        where: { orderId: o.id, userId },
+      })
+      return {
+        id: o.id,
+        createdAt: o.createdAt,
+        paidAt: o.paidAt,
+        offerName: o.offerName,
+        customerName: o.customerName,
+        paymentMethod: o.paymentMethod,
+        value: o.value,
+        discountAmount: o.discountAmount,
+        netValue: o.netValue,
+        logisticsCost: o.checkout?.product?.unitCost ?? 0,
+        trackingCode: o.trackingCode,
+        sellerName: o.seller?.name ?? null,
+        productName: o.checkout?.product?.name ?? null,
+        logisticPaid: !!logisticPaid,
+        logisticPaidAmount: logisticPaid?.amount ?? 0,
+      }
+    })
+  )
 
   const summary = {
     orderCount: rows.length,
@@ -59,6 +68,11 @@ export async function GET(req: NextRequest) {
     totalLogisticsCost: rows.reduce((s, r) => s + r.logisticsCost, 0),
     totalNet: rows.reduce((s, r) => s + r.netValue, 0),
     totalMargin: rows.reduce((s, r) => s + r.netValue - r.logisticsCost, 0),
+    totalLogisticPaid: rows.reduce((s, r) => s + r.logisticPaidAmount, 0),
+    pendingLogisticCost: rows.reduce(
+      (s, r) => s + (r.logisticPaid ? 0 : r.logisticsCost),
+      0
+    ),
   }
 
   return NextResponse.json({ orders: rows, summary })

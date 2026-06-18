@@ -1,9 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { sendPushToUser } from '@/lib/push'
+import { dispatchWebhook } from '@/lib/webhook'
+import crypto from 'crypto'
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json()
+    const rawBody = await req.text()
+    const signature = req.headers.get('x-pagarme-signature') ?? ''
+    const secret = process.env.PAGARME_WEBHOOK_SECRET ?? ''
+
+    if (secret) {
+      const expected = crypto.createHmac('sha256', secret).update(rawBody).digest('hex')
+      if (signature && signature !== expected) {
+        return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+      }
+    }
+
+    const body = JSON.parse(rawBody)
     const eventType = body.type
     const data = body.data
 
@@ -21,7 +35,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true })
     }
 
-    if (eventType === 'order.paid' || data.status === 'paid') {
+    let newStatus = order.status
+
+    if (
+      eventType === 'order.paid' ||
+      eventType === 'charge.paid' ||
+      data.status === 'paid'
+    ) {
+      newStatus = 'PAID'
       await prisma.order.update({
         where: { id: order.id },
         data: {
@@ -31,15 +52,50 @@ export async function POST(req: NextRequest) {
         },
       })
     } else if (eventType === 'charge.refunded' || data.status === 'refunded') {
+      newStatus = 'REFUNDED'
       await prisma.order.update({
         where: { id: order.id },
         data: { status: 'REFUNDED', gatewayStatus: 'refunded' },
       })
+    } else if (
+      eventType === 'charge.chargebacked' ||
+      eventType === 'chargeback.received'
+    ) {
+      newStatus = 'CHARGEBACK'
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { status: 'CHARGEBACK', gatewayStatus: 'chargeback' },
+      })
+    } else if (eventType === 'charge.antifraud_approved') {
+      newStatus = 'CONFIRMED'
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { status: 'CONFIRMED', gatewayStatus: 'confirmed' },
+      })
     } else if (data.status === 'failed' || data.status === 'canceled') {
+      newStatus = 'CANCELLED'
       await prisma.order.update({
         where: { id: order.id },
         data: { status: 'CANCELLED', gatewayStatus: data.status },
       })
+    }
+
+    const updated = await prisma.order.findUnique({ where: { id: order.id } })
+    if (!updated) return NextResponse.json({ received: true })
+
+    if (newStatus === 'PAID') {
+      await sendPushToUser(order.userId, {
+        title: '💰 Novo pedido pago!',
+        body: `${updated.customerName} • R$ ${updated.value.toFixed(2)} (${updated.paymentMethod})`,
+        url: `/admin/pedidos/${updated.id}`,
+      })
+      await dispatchWebhook(order.userId, 'order.paid', updated)
+    }
+    if (newStatus === 'REFUNDED') {
+      await dispatchWebhook(order.userId, 'order.refunded', updated)
+    }
+    if (newStatus === 'CHARGEBACK') {
+      await dispatchWebhook(order.userId, 'order.chargeback', updated)
     }
 
     return NextResponse.json({ received: true })

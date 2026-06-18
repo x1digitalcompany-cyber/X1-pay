@@ -1,0 +1,512 @@
+================================================================================
+                         X1 PAY — RESUMO DO SISTEMA
+                    Atualizado em: 16/06/2026
+================================================================================
+
+Versão: 1.0.0
+Stack: Next.js 14 + React 18 + TypeScript + Prisma + NextAuth + Tailwind CSS
+Banco: PostgreSQL (Supabase em produção; docker-compose.yml para local)
+Deploy: Vercel (frontend) + Supabase (banco)
+
+================================================================================
+1. VISÃO GERAL
+================================================================================
+
+O X1 Pay é uma plataforma de gestão de pagamentos e vendas online voltada para
+negócios que vendem produtos físicos (ex.: suplementos). O sistema permite:
+
+  - Gerenciar produtos e ofertas (checkouts/kits) com links públicos
+  - Processar pagamentos via Pagar.me (PIX, cartão e boleto)
+  - Acompanhar pedidos, faturamento e meta de lucro no dashboard
+  - Cadastrar vendedores e calcular comissões/ranking
+  - Configurar taxas de gateway, logística e marca (white-label)
+  - Integrar logística (123Log) e rastreamento (webhook Payt / Luminar Track)
+  - Aplicar cupons de desconto no checkout
+  - Conferir acerto logístico (pedidos pagos x custos) com exportação XLSX
+
+Layout:
+  - Admin: sidebar + topbar fixa, tema claro/escuro alternável
+  - Checkout público: layout claro, 3 etapas (dados → entrega → pagamento)
+  - Cor da marca via CSS custom property --brand-color (carregada das settings)
+
+================================================================================
+2. ESTRUTURA DE PASTAS
+================================================================================
+
+x1pay/
+├── prisma/
+│   ├── schema.prisma          # Modelos do banco (PostgreSQL)
+│   └── seed.ts                # Admin demo + produto + vendedor
+├── src/
+│   ├── app/
+│   │   ├── (admin)/admin/     # Painel administrativo (protegido por login)
+│   │   │   ├── layout.tsx     # Sidebar + topbar + tema + meta modal
+│   │   │   ├── dashboard/
+│   │   │   ├── produtos/      # lista, novo, [id]
+│   │   │   ├── pedidos/       # lista, novo, [id]
+│   │   │   ├── vendedores/    # ranking + lista
+│   │   │   ├── cupons/
+│   │   │   ├── acerto-logistica/
+│   │   │   └── configuracoes/ # ConfiguracoesClient.tsx + page.tsx
+│   │   ├── checkout/[slug]/   # Checkout público
+│   │   ├── api/               # Rotas REST
+│   │   ├── login/
+│   │   ├── layout.tsx         # Root layout + Toaster (sonner)
+│   │   ├── providers.tsx      # SessionProvider (NextAuth)
+│   │   └── globals.css        # Temas claro/escuro + --brand-color
+│   ├── components/
+│   │   ├── admin/             # Sidebar, MetaModal
+│   │   └── checkout/          # StepDadosPessoais, StepEntrega, StepPagamento
+│   ├── lib/
+│   │   ├── prisma.ts
+│   │   ├── auth.ts            # NextAuth + getAdminUserId
+│   │   ├── pagarme.ts         # API Pagar.me + calculateNetValue
+│   │   ├── logistica.ts       # Integração 123Log
+│   │   └── utils.ts           # Formatação, máscaras, ViaCEP, badges de status
+│   └── types/
+│       └── next-auth.d.ts
+├── .env                       # Variáveis locais (não versionar)
+├── .env.example               # Modelo Supabase + NextAuth + Pagar.me
+├── docker-compose.yml         # PostgreSQL local (opcional)
+├── RESUMO_SISTEMA.txt         # Este arquivo
+├── package.json
+├── next.config.js
+├── tailwind.config.ts         # darkMode: 'class'
+└── tsconfig.json
+
+================================================================================
+3. BANCO DE DADOS (PRISMA)
+================================================================================
+
+Provider: postgresql
+  DATABASE_URL  — connection pooling (Supabase porta 6543 / pgbouncer)
+  DIRECT_URL    — conexão direta para migrations (porta 5432)
+
+Modelos:
+
+  User
+    Administrador da conta. Campos: email, password, name, role, logoUrl,
+    brandName, brandColor, currency, defaultTax, maxInstallments.
+
+  Settings
+    Configurações por usuário: gateway (pagarme/asaas), chaves API, taxas
+  (PIX, boleto, gateway, antifraude, cartão 1x–12x), logística 123Log,
+    luminarTrackUrl, monthlyGoal (meta de lucro do mês).
+
+  Product
+    Produto físico: nome, descrição, categoria, tipo (Cápsula/Gotas/etc.),
+    unitCost, logisticsId, imageUrl, isActive.
+
+  Checkout
+    Oferta/kit de venda: name, slug (único), price, isActive.
+    Vinculado a um Product.
+
+  Order
+    Pedido completo: cliente, endereço, pagamento, rastreio, gateway.
+    Campos extras: couponCode, discountAmount, directPayment.
+    netValue = valor líquido após taxas (calculateNetValue).
+
+  Seller
+    Vendedor: name, email, phone, commission (%), isActive.
+
+  Employee
+    Funcionário com login próprio (role EMPLOYEE na sessão).
+
+  Coupon
+    Cupom: code, type (PERCENTAGE/FIXED), value, minOrderValue,
+    maxUses, usedCount, expiresAt, isActive.
+    Unique: [userId, code]
+
+  AbandonedCart
+    Carrinho abandonado: checkoutSlug, name, email, phone.
+
+Status de pedido (Order.status — String):
+  PENDING, WAITING_PAYMENT, PAID, CONFIRMED, REFUNDED, CHARGEBACK, CANCELLED
+
+Formas de pagamento (Order.paymentMethod — String):
+  PIX, CARD, BOLETO
+
+Papéis (User.role / sessão):
+  ADMIN    — dono da conta
+  EMPLOYEE — funcionário vinculado (adminId no token JWT)
+
+================================================================================
+4. AUTENTICAÇÃO E SEGURANÇA
+================================================================================
+
+Tecnologia: NextAuth v4, Credentials Provider, sessão JWT.
+
+Fluxo:
+  1. Login em /login (email + senha)
+  2. Busca em User (admin) ou Employee (funcionário)
+  3. Validação bcrypt
+  4. JWT com: id, email, name, role, adminId (se funcionário)
+  5. Redirect para /admin/dashboard
+
+getAdminUserId(session):
+  - ADMIN    → retorna session.user.id
+  - EMPLOYEE → retorna session.user.adminId
+  - Usado em TODAS as queries API para isolar dados por conta
+
+Proteção de rotas:
+  - /admin/* → layout verifica useSession; redirect /login se não autenticado
+  - APIs    → getServerSession + getAdminUserId; 401 se inválido
+
+Credenciais seed (npm run db:seed):
+  Email: admin@x1pay.com
+  Senha: admin123
+  Checkout demo: /checkout/produto-exemplo
+
+================================================================================
+5. LAYOUT DO PAINEL ADMIN
+================================================================================
+
+SIDEBAR (components/admin/Sidebar.tsx)
+  - Menu lateral fixo (w-64), oculto em mobile (hamburger abre overlay)
+  - Apenas navegação com submenus expansíveis:
+      Dashboard, Produtos, Pedidos, Vendedores (Ranking/Todos),
+      Acerto logística, Marketing (Cupons), Configurações (Geral/Pagamento/Logística)
+  - SEM header (logo/marca) e SEM footer (email/logout) — movidos para topbar
+
+TOPBAR (admin/layout.tsx — header fixo sticky)
+  - Botão hamburguer (mobile)
+  - Botão "Definir meta do mês" → abre MetaModal
+  - Email do usuário logado
+  - Toggle dark/light (persiste em localStorage: x1pay-theme)
+  - Aplica --brand-color das configurações no container
+
+MODAL "META DE LUCRO" (components/admin/MetaModal.tsx)
+  - Título: "Meta de lucro" (ícone Target)
+  - Texto explicativo sobre lucro líquido
+  - Input valor R$
+  - Botões: "Agora não" e "Definir meta"
+  - Salva via PATCH /api/configuracoes { settings: { monthlyGoal } }
+
+TEMAS (globals.css + tailwind darkMode: 'class')
+  - Claro (padrão): fundo #f8fafc, painéis brancos
+  - Escuro (.dark): fundo #0f0a1e, painéis #1a1030, sidebar #13092a
+  - Variáveis CSS: --admin-bg, --admin-panel-bg, --sidebar-bg,
+    --admin-text, --admin-muted, --admin-border, --brand-color
+
+================================================================================
+6. PÁGINAS DO ADMIN — IMPLEMENTADAS
+================================================================================
+
+/admin/dashboard
+  - Cards: faturamento, líquido, pedidos, conversão (mês atual)
+  - Gráfico barras: vendas últimos 7 dias
+  - Gráfico pizza: pedidos por forma de pagamento
+  - Tabela: últimos 10 pedidos
+  - Meta do mês definida via topbar (não mais no dashboard)
+
+/admin/produtos
+  - Lista produtos com checkouts e links públicos
+  - /novo — criar produto + checkout inicial
+  - /[id] — editar produto, checkouts e status ativo
+
+/admin/pedidos
+  - Lista com busca textual e filtro por status
+  - Marcar pedido como pago manualmente
+  - /novo — pedido manual (venda direta)
+  - /[id] — detalhe completo: cliente, endereço, pagamento, gateway
+            (PIX QR, boleto), rastreio editável, alteração de status
+
+/admin/vendedores
+  - Ranking por faturamento e comissão ganha no mês
+
+/admin/vendedores/lista
+  - CRUD vendedores: nome, email, telefone, comissão %, ativo/inativo
+
+/admin/cupons
+  - CRUD cupons: código, tipo (% ou R$), valor, usos, validade
+  - Toggle ativar/desativar, deletar
+
+/admin/acerto-logistica
+  - Filtro por período (De/Até)
+  - Cards resumo: pedidos, faturamento, descontos, custo logística, líquido, margem
+  - Tabela detalhada de pedidos pagos/confirmados
+  - Exportar planilha XLSX (biblioteca xlsx)
+
+/admin/configuracoes
+  - Aba Geral: marca, cor, logo URL, parcelas máximas
+  - Aba Pagamento: chave Pagar.me, taxas PIX/boleto/cartão 1x–12x
+  - Aba Logística: 123Log, API, origem, postback Payt, Luminar Track
+
+/login
+  - Tela de autenticação (tema escuro fixo)
+
+/checkout/[slug]
+  - Checkout público em 3 etapas (ver seção 8)
+
+================================================================================
+7. PÁGINAS PLANEJADAS (AINDA NÃO IMPLEMENTADAS)
+================================================================================
+
+  /admin/carrinho-abandonado     — listagem de AbandonedCart
+  /admin/saques                  — saques de comissão dos vendedores
+  /admin/roleta                  — roleta de prêmios para vendedores
+  /admin/gerar-link              — gerador de links com ?src= e UTM
+  /admin/relatorios/logistica    — acerto logística avançado (pagamentos à logística)
+  /admin/cupons-desconto         — rota alternativa (hoje: /admin/cupons)
+
+Dashboard avançado (especificação):
+  - 6 cards detalhados (a receber líquido, vendas, pendente, conversão por método,
+    chargeback, reembolso)
+  - Filtros: Hoje, 7 dias, Mês, período personalizado
+  - Gráfico vendas por dia da semana (90 dias)
+  - Seção "A receber por forma de pagamento" com tabs R$/%
+
+Produtos avançado:
+  - Tabela com ações duplicar/toggle
+  - Abas Configuração + Checkouts com modal "Novo kit"
+  - Upload de imagem
+
+Pedidos avançado:
+  - Drawer de filtros lateral
+  - Exportar/importar planilha de rastreios
+  - Histórico de status, reembolso manual, envio logística manual
+
+Configurações avançado (8 abas):
+  - track, dashboard Luminar, funcionários, notificações push, segurança
+
+================================================================================
+8. CHECKOUT PÚBLICO
+================================================================================
+
+URL: /checkout/[slug]
+Exemplo: http://localhost:3000/checkout/produto-exemplo
+
+Componentes:
+  StepDadosPessoais — nome, email, telefone, CPF (máscaras)
+  StepEntrega       — CEP (ViaCEP), endereço completo
+  StepPagamento     — PIX / Cartão / Boleto
+
+Fluxo:
+  1. GET /api/checkout/[slug] — carrega oferta, produto, marca
+  2. Cliente preenche 3 etapas
+  3. POST /api/checkout/[slug] — cria Order + cobrança Pagar.me
+  4. Exibe QR PIX, link boleto ou confirma cartão
+  5. Webhook atualiza status para PAID
+
+Cupom:
+  POST /api/checkout/[slug]/coupon — valida cupom e retorna desconto/finalPrice
+  Tipos: PERCENTAGE (%) ou FIXED (R$)
+  Valida: ativo, não expirado, limite de usos, valor mínimo
+
+Campos Order com cupom:
+  couponCode, discountAmount
+
+================================================================================
+9. API REST — ROTAS COMPLETAS
+================================================================================
+
+Autenticação:
+  GET/POST  /api/auth/[...nextauth]
+
+Dashboard e config:
+  GET       /api/dashboard
+  GET       /api/configuracoes
+  PUT       /api/configuracoes          Atualiza marca + settings completas
+  PATCH     /api/configuracoes          Atualiza apenas monthlyGoal (meta de lucro)
+
+Produtos:
+  GET/POST  /api/produtos
+  GET/PUT/DELETE  /api/produtos/[id]
+
+Pedidos:
+  GET/POST  /api/pedidos                Filtros: status, search (nome/email/oferta)
+  GET/PUT/DELETE  /api/pedidos/[id]     PUT PAID/CONFIRMED dispara logística 123Log
+
+Vendedores:
+  GET       /api/vendedores               Ranking (comissão calculada)
+  POST      /api/vendedores               Criar vendedor
+  PUT       /api/vendedores               Atualizar vendedor
+  DELETE    /api/vendedores?id=           Excluir vendedor
+
+Cupons:
+  GET/POST  /api/cupons
+  GET/PUT/DELETE  /api/cupons/[id]
+
+Acerto logística:
+  GET       /api/acerto-logistica?from=&to=
+            Retorna { orders[], summary{} }
+
+Checkout (público, sem sessão):
+  GET       /api/checkout/[slug]
+  POST      /api/checkout/[slug]
+  POST      /api/checkout/[slug]/coupon
+
+Webhooks (sem sessão):
+  POST      /api/webhook/pagarme
+  POST      /api/webhook/payt/[token]
+
+APIs planejadas (não implementadas):
+  POST      /api/carrinho-abandonado
+  POST      /api/cupons/validar
+  GET       /api/pedidos/exportar
+  POST      /api/pedidos/importar-rastreios
+  CRUD      /api/saques, /api/funcionarios, /api/logistic-payments
+
+================================================================================
+10. INTEGRAÇÕES EXTERNAS
+================================================================================
+
+PAGAR.ME (lib/pagarme.ts)
+  - API v5: POST /orders (PIX, cartão, boleto)
+  - Auth: secret key como username HTTP Basic
+  - calculateNetValue(): líquido após taxas + custo unitário do produto
+  - Chave: Settings.pagarmeSecretKey ou env PAGARME_SECRET_KEY
+
+123LOG (lib/logistica.ts)
+  - send123LogOrder() ao marcar pedido PAID/CONFIRMED
+  - Requer: logisticsEnabled + apiUrl + apiKey + origin
+  - Payload: cliente, endereço, itens, pedido_externo = Order.id
+
+VIACEP (lib/utils.ts)
+  - fetchAddressByCep() no checkout
+
+WEBHOOK PAGAR.ME (/api/webhook/pagarme)
+  - order.paid / charge.paid → status PAID + paidAt
+  - charge.refunded → REFUNDED
+  - charge.failed/canceled → CANCELLED
+
+WEBHOOK PAYT (/api/webhook/payt/[token])
+  - Valida logisticsPostbackKey
+  - Atualiza trackingCode, trackingUrl
+  - Status PAID → CONFIRMED
+
+LUMINAR TRACK / DASHBOARD LUMINAR
+  - Campos em Settings: luminarTrackUrl
+  - Integração POST automática: planejada, não implementada
+
+================================================================================
+11. CÁLCULO DE VALOR LÍQUIDO
+================================================================================
+
+Função: calculateNetValue() em lib/pagarme.ts
+
+  PIX:     valor × (1 - taxPix%) - taxGateway - taxAntifraude - unitCost
+  BOLETO:  valor - taxBoleto - taxGateway - taxAntifraude - unitCost
+  CARTÃO:  valor × (1 - taxCardNx%) - taxGateway - taxAntifraude - unitCost
+           N = parcelas (1 a 12, taxas configuráveis em Settings)
+
+Salvo em Order.netValue na criação do pedido.
+directPayment=true ignora taxas do gateway (pedido manual).
+
+================================================================================
+12. VARIÁVEIS DE AMBIENTE
+================================================================================
+
+DATABASE_URL          URL PostgreSQL com pooling (Supabase porta 6543)
+DIRECT_URL            URL PostgreSQL direta para migrations (porta 5432)
+NEXTAUTH_SECRET       Chave JWT (openssl rand -base64 32)
+NEXTAUTH_URL          URL base do app (ex: https://projeto.vercel.app)
+NEXT_PUBLIC_APP_URL   URL pública
+PAGARME_SECRET_KEY    Fallback da chave Pagar.me
+
+================================================================================
+13. COMANDOS ÚTEIS
+================================================================================
+
+  npm install
+  npm run dev           Desenvolvimento (porta 3000 ou próxima livre)
+  npm run build         Build de produção
+  npm run start         Servidor de produção
+  npm run db:push       Sincroniza schema (usa DIRECT_URL)
+  npm run db:seed       Popula admin + produto demo + vendedor
+  npm run db:studio     Prisma Studio
+
+Setup local rápido:
+  1. cp .env.example .env  (preencher URLs Supabase ou usar docker-compose)
+  2. npm install
+  3. npm run db:push
+  4. npm run db:seed
+  5. npm run dev
+  6. http://localhost:3000/login
+
+Docker local (sem Supabase):
+  docker compose up -d
+  DATABASE_URL=postgresql://x1pay:x1pay123@localhost:5432/x1pay
+
+================================================================================
+14. FLUXO COMPLETO DE UMA VENDA
+================================================================================
+
+  1. Admin cria produto em /admin/produtos/novo
+  2. Sistema gera checkout com slug (ex: produto-exemplo)
+  3. Cliente acessa /checkout/produto-exemplo
+  4. (Opcional) Aplica cupom via /api/checkout/[slug]/coupon
+  5. Preenche dados, endereço, escolhe pagamento
+  6. POST /api/checkout/[slug] cria Order + cobrança Pagar.me
+  7. Cliente paga (PIX/boleto/cartão)
+  8. Webhook Pagar.me → status PAID, paidAt preenchido
+  9. Se logística habilitada → send123LogOrder()
+  10. Webhook Payt → trackingCode + status CONFIRMED
+  11. Dashboard e acerto logística refletem os valores
+
+================================================================================
+15. BADGES DE STATUS (UI)
+================================================================================
+
+  PAID             → text-green-400
+  CONFIRMED        → text-green-500
+  PENDING          → text-yellow-400
+  WAITING_PAYMENT  → text-blue-400
+  REFUNDED         → text-orange-400
+  CHARGEBACK       → text-red-400
+  CANCELLED        → text-gray-400
+
+Funções em lib/utils.ts: getOrderStatusLabel(), getOrderStatusColor()
+
+================================================================================
+16. DEPENDÊNCIAS PRINCIPAIS
+================================================================================
+
+  next, react, react-dom       Framework
+  @prisma/client, prisma       ORM (PostgreSQL)
+  next-auth                    Autenticação JWT
+  bcryptjs                     Hash de senhas
+  axios                        HTTP (Pagar.me, 123Log)
+  recharts                     Gráficos dashboard
+  date-fns                     Datas e filtros de período
+  lucide-react                 Ícones
+  sonner                       Toasts (toast.success / toast.error)
+  tailwindcss                  Estilos + darkMode class
+  xlsx                         Exportação planilhas (acerto logística)
+  zod, react-hook-form         Disponíveis para validação de formulários
+  pagarme                      SDK legado (referência)
+
+================================================================================
+17. OBSERVAÇÕES TÉCNICAS
+================================================================================
+
+  - Schema usa PostgreSQL com connection pooling (Supabase) em produção
+  - Status e enums armazenados como String (compatível com SQLite legado)
+  - Funcionários (Employee) acessam dados do admin via adminId no JWT
+  - Checkouts/produtos inativos retornam 404 no checkout público
+  - Pedidos manuais em /admin/pedidos/novo para vendas offline
+  - Acerto logística: custo = product.unitCost por pedido pago
+  - Cupons: unique [userId, code], uppercase automático
+  - Busca em pedidos: contains sem mode insensitive (limitação SQLite legado)
+  - Múltiplas instâncias npm run dev ocupam portas 3000–3004; feche terminais antigos
+  - Meta de lucro (monthlyGoal) salva via PATCH, não mais via PUT completo
+
+================================================================================
+18. ROADMAP — PRÓXIMAS IMPLEMENTAÇÕES
+================================================================================
+
+  [ ] Dashboard com 6 cards + filtros de data + gráfico 90 dias
+  [ ] Produtos: tabela avançada, abas, upload imagem, duplicar
+  [ ] Pedidos: drawer filtros, exportar/importar XLSX rastreios
+  [ ] Carrinho abandonado (POST ao preencher dados no checkout)
+  [ ] Saques de vendedores (Withdrawal model)
+  [ ] Roleta de prêmios
+  [ ] Gerar link com ?src= e UTM
+  [ ] Configurações: 8 abas (funcionários, notificações push, segurança)
+  [ ] Webhook Pagar.me com verificação de assinatura
+  [ ] Luminar Track + Dashboard Luminar automáticos no webhook
+  [ ] Push notifications (Service Worker) ao pedido pago
+
+================================================================================
+                            FIM DO RESUMO
+================================================================================

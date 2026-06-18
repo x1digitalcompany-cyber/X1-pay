@@ -26,14 +26,31 @@ export async function POST(
       return NextResponse.json({ error: 'Token inválido' }, { status: 401 })
     }
 
+    const trackingCode = body.codigo_rastreio || body.trackingCode
+    const trackingUrl = body.url_rastreio || body.trackingUrl
+
     await prisma.order.update({
       where: { id: orderId },
       data: {
-        trackingCode: body.codigo_rastreio || body.trackingCode,
-        trackingUrl: body.url_rastreio || body.trackingUrl,
+        trackingCode,
+        trackingUrl,
         status: order.status === 'PAID' ? 'CONFIRMED' : order.status,
       },
     })
+
+    if (settings?.luminarTrackUrl) {
+      await fetch(settings.luminarTrackUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: order.id,
+          tracking_code: trackingCode,
+          tracking_url: trackingUrl,
+          customer_name: order.customerName,
+          customer_email: order.customerEmail,
+        }),
+      }).catch(() => {})
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

@@ -7,3 +7,4 @@ node_modules
 prisma/dev.db
 prisma/*.db
 prisma/*.db-journal
+tsconfig.tsbuildinfo

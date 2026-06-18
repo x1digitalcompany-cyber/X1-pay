@@ -11,6 +11,10 @@ import {
   Settings,
   X,
   ChevronDown,
+  ShoppingBag,
+  Banknote,
+  Dices,
+  Link2,
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -24,20 +28,31 @@ const menuItems = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/produtos', label: 'Produtos', icon: Package },
   { href: '/admin/pedidos', label: 'Pedidos', icon: ShoppingCart },
+  { href: '/admin/carrinho-abandonado', label: 'Carrinho abandonado', icon: ShoppingBag },
   {
     label: 'Vendedores',
     icon: Users,
     children: [
       { href: '/admin/vendedores', label: 'Ranking' },
       { href: '/admin/vendedores/lista', label: 'Todos' },
+      { href: '/admin/saques', label: 'Saques' },
+      { href: '/admin/roleta', label: 'Roleta' },
     ],
   },
-  { href: '/admin/acerto-logistica', label: 'Acerto logística', icon: Truck },
+  {
+    label: 'Acerto logística',
+    icon: Truck,
+    children: [
+      { href: '/admin/acerto-logistica', label: 'Resumo' },
+      { href: '/admin/acerto-logistica/pagamentos', label: 'Pagamentos' },
+    ],
+  },
   {
     label: 'Marketing',
     icon: Megaphone,
     children: [
       { href: '/admin/cupons', label: 'Cupons' },
+      { href: '/admin/gerar-link', label: 'Gerar link' },
     ],
   },
   {
@@ -47,13 +62,18 @@ const menuItems = [
       { href: '/admin/configuracoes', label: 'Geral' },
       { href: '/admin/configuracoes?tab=pagamento', label: 'Pagamento' },
       { href: '/admin/configuracoes?tab=logistica', label: 'Logística' },
+      { href: '/admin/configuracoes?tab=rastreamento', label: 'Rastreamento' },
+      { href: '/admin/configuracoes?tab=funcionarios', label: 'Funcionários' },
+      { href: '/admin/configuracoes?tab=notificacoes', label: 'Notificações' },
+      { href: '/admin/configuracoes?tab=seguranca', label: 'Segurança' },
+      { href: '/admin/configuracoes?tab=webhook', label: 'Webhook' },
     ],
   },
 ]
 
 export function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname()
-  const [expanded, setExpanded] = useState<string[]>([])
+  const [expanded, setExpanded] = useState<string[]>(['Vendedores', 'Acerto logística', 'Marketing', 'Configurações'])
 
   function toggleExpand(label: string) {
     setExpanded((prev) =>
@@ -61,13 +81,16 @@ export function Sidebar({ open, onClose }: SidebarProps) {
     )
   }
 
+  const iconMap: Record<string, typeof LayoutDashboard> = {
+    Saques: Banknote,
+    Roleta: Dices,
+    'Gerar link': Link2,
+  }
+
   return (
     <>
       {open && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={onClose}
-        />
+        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={onClose} />
       )}
 
       <aside
@@ -91,34 +114,35 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 <div key={item.label}>
                   <button
                     onClick={() => toggleExpand(item.label)}
-                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-gray-300 hover:bg-purple-900/20 hover:text-white transition"
+                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-[var(--admin-muted)] hover:bg-purple-900/20 hover:text-[var(--admin-text)] transition"
                   >
                     <div className="flex items-center gap-3">
                       <item.icon size={18} />
                       <span className="text-sm">{item.label}</span>
                     </div>
-                    <ChevronDown
-                      size={14}
-                      className={cn('transition-transform', isExp && 'rotate-180')}
-                    />
+                    <ChevronDown size={14} className={cn('transition-transform', isExp && 'rotate-180')} />
                   </button>
                   {isExp && (
                     <div className="ml-8 mt-1 space-y-1">
-                      {item.children.map((child) => (
-                        <Link
-                          key={child.href}
-                          href={child.href}
-                          onClick={onClose}
-                          className={cn(
-                            'block px-3 py-2 rounded-lg text-sm transition',
-                            pathname === child.href.split('?')[0]
-                              ? 'bg-purple-700 text-white'
-                              : 'text-[var(--admin-muted)] hover:text-[var(--admin-text)] hover:bg-purple-900/20'
-                          )}
-                        >
-                          {child.label}
-                        </Link>
-                      ))}
+                      {item.children.map((child) => {
+                        const ChildIcon = iconMap[child.label]
+                        return (
+                          <Link
+                            key={child.href}
+                            href={child.href}
+                            onClick={onClose}
+                            className={cn(
+                              'flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition',
+                              pathname === child.href.split('?')[0]
+                                ? 'bg-purple-700 text-white'
+                                : 'text-[var(--admin-muted)] hover:text-[var(--admin-text)] hover:bg-purple-900/20'
+                            )}
+                          >
+                            {ChildIcon && <ChildIcon size={14} />}
+                            {child.label}
+                          </Link>
+                        )
+                      })}
                     </div>
                   )}
                 </div>

@@ -30,7 +30,7 @@ export async function PUT(
   if (!userId) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const body = await req.json()
-  const { status, trackingCode, trackingUrl, sellerId } = body
+  const { status, trackingCode, trackingUrl, sellerId, refundNote } = body
 
   const updateData: Record<string, unknown> = {}
   if (status) {
@@ -42,6 +42,7 @@ export async function PUT(
   if (trackingCode !== undefined) updateData.trackingCode = trackingCode
   if (trackingUrl !== undefined) updateData.trackingUrl = trackingUrl
   if (sellerId !== undefined) updateData.sellerId = sellerId
+  if (refundNote !== undefined) updateData.refundNote = refundNote
 
   const order = await prisma.order.updateMany({
     where: { id: params.id, userId },
