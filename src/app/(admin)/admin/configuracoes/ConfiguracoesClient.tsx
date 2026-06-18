@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { toast } from 'sonner'
-import { Trash2, Plus, Loader2, X, ImageIcon } from 'lucide-react'
+import { Trash2, Plus, Loader2, X, ImageIcon, Copy, Eye, EyeOff } from 'lucide-react'
 
 interface Employee {
   id: string
@@ -86,6 +86,10 @@ export default function ConfiguracoesPage() {
   const [pushLoading, setPushLoading] = useState(false)
   const [luminarTesting, setLuminarTesting] = useState(false)
   const [webhookTesting, setWebhookTesting] = useState(false)
+  const [selectedGateway, setSelectedGateway] = useState<'pagarme' | 'asaas'>('pagarme')
+  const [showPagarmeKey, setShowPagarmeKey] = useState(false)
+  const [showAsaasKey, setShowAsaasKey] = useState(false)
+  const [pagarmeWebhookUrl, setPagarmeWebhookUrl] = useState('')
 
   const loadConfig = useCallback(() => {
     fetch('/api/configuracoes')
@@ -100,6 +104,8 @@ export default function ConfiguracoesPage() {
           maxInstallments: res.maxInstallments || 12,
           settings: { ...prev.settings, ...res.settings },
         }))
+        const gw = res.settings?.gateway === 'asaas' ? 'asaas' : 'pagarme'
+        setSelectedGateway(gw)
       })
       .finally(() => setLoading(false))
   }, [])
@@ -107,6 +113,13 @@ export default function ConfiguracoesPage() {
   useEffect(() => {
     loadConfig()
   }, [loadConfig])
+
+  useEffect(() => {
+    const base =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      (typeof window !== 'undefined' ? window.location.origin : '')
+    setPagarmeWebhookUrl(`${base}/api/webhook/pagarme`)
+  }, [])
 
   useEffect(() => {
     if (tab === 'funcionarios') {
@@ -310,7 +323,7 @@ export default function ConfiguracoesPage() {
     )
   }
 
-  const settingsTabs = ['geral', 'pagamento', 'logistica', 'track', 'dashboard']
+  const settingsTabs = ['geral', 'pagamento', 'logistica', 'parcelamentos', 'track', 'dashboard']
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -321,13 +334,15 @@ export default function ConfiguracoesPage() {
         </p>
       )}
 
-      <div className="flex flex-wrap gap-2 border-b border-purple-900/30 pb-2">
+      <div className="flex overflow-x-auto whitespace-nowrap border-b border-[var(--admin-border)] mb-6 gap-1 pb-0">
         {tabs.map((t) => (
           <a
             key={t.id}
             href={t.href}
-            className={`px-3 py-2 rounded-lg text-sm transition ${
-              tab === t.id ? 'bg-purple-700 text-white' : 'text-gray-400 hover:text-white'
+            className={`px-4 py-2 text-sm font-medium shrink-0 rounded-t transition-colors ${
+              tab === t.id
+                ? 'bg-purple-600 text-white'
+                : 'text-[var(--admin-muted)] hover:text-[var(--admin-text)]'
             }`}
           >
             {t.label}
@@ -420,13 +435,6 @@ export default function ConfiguracoesPage() {
                 <input type="number" step="0.01" className={inputClass} value={data.defaultTax} onChange={(e) => setData({ ...data, defaultTax: Number(e.target.value) })} />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Gateway de pagamento ativo</label>
-                <select className={inputClass} value={data.settings.gateway} onChange={(e) => setData({ ...data, settings: { ...data.settings, gateway: e.target.value } })}>
-                  <option value="pagarme">Pagar.me</option>
-                  <option value="asaas">Asaas</option>
-                </select>
-              </div>
-              <div>
                 <label className="block text-sm text-gray-400 mb-1">Máx. parcelas</label>
                 <input type="number" className={inputClass} value={data.maxInstallments} onChange={(e) => setData({ ...data, maxInstallments: Number(e.target.value) })} />
               </div>
@@ -439,62 +447,138 @@ export default function ConfiguracoesPage() {
 
           {tab === 'pagamento' && (
             <>
-              <p className="text-sm text-gray-300 font-medium">Pagar.me</p>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Chave privada</label>
-                <input
-                  type="password"
+                <label className="block text-sm text-gray-400 mb-1">Gateway de pagamento ativo</label>
+                <select
                   className={inputClass}
-                  value={data.settings.pagarmeSecretKey || ''}
-                  onChange={(e) => setData({ ...data, settings: { ...data.settings, pagarmeSecretKey: e.target.value } })}
-                />
+                  value={selectedGateway}
+                  onChange={(e) => {
+                    const gw = e.target.value as 'pagarme' | 'asaas'
+                    setSelectedGateway(gw)
+                    setData({ ...data, settings: { ...data.settings, gateway: gw } })
+                  }}
+                >
+                  <option value="pagarme">Pagar.me</option>
+                  <option value="asaas">Asaas</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Escolha o gateway que vai processar os pagamentos. Abaixo aparecem só os campos dele.
+                </p>
               </div>
-              <p className="text-sm text-gray-300 font-medium pt-2">Asaas</p>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Chave de API</label>
-                <input
-                  type="password"
-                  className={inputClass}
-                  value={data.settings.asaasApiKey || ''}
-                  onChange={(e) => setData({ ...data, settings: { ...data.settings, asaasApiKey: e.target.value } })}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">Taxa PIX (%)</label>
-                  <input type="number" step="0.01" className={inputClass} value={data.settings.taxPix} onChange={(e) => setData({ ...data, settings: { ...data.settings, taxPix: Number(e.target.value) } })} />
+
+              {selectedGateway === 'pagarme' && (
+                <div className="space-y-4 pt-2 border-t border-purple-900/30">
+                  <p className="text-sm text-gray-300 font-medium">Pagar.me</p>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Chave privada (secret key)</label>
+                    <div className="relative">
+                      <input
+                        type={showPagarmeKey ? 'text' : 'password'}
+                        className={`${inputClass} pr-10`}
+                        placeholder="sk_..."
+                        value={data.settings.pagarmeSecretKey || ''}
+                        onChange={(e) =>
+                          setData({ ...data, settings: { ...data.settings, pagarmeSecretKey: e.target.value } })
+                        }
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPagarmeKey((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                        aria-label={showPagarmeKey ? 'Ocultar chave' : 'Mostrar chave'}
+                      >
+                        {showPagarmeKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Use apenas a chave privada (sk_...). A chave pública (pk_...) não é necessária.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">
+                      URL do webhook (cadastre no painel da Pagar.me)
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        readOnly
+                        className={`${inputClass} flex-1 text-gray-400`}
+                        value={pagarmeWebhookUrl}
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          navigator.clipboard.writeText(pagarmeWebhookUrl).then(() => toast.success('URL copiada!'))
+                        }
+                        className="px-3 py-2 rounded-lg border border-purple-700/50 text-purple-300 hover:bg-purple-900/30 shrink-0"
+                        title="Copiar URL"
+                      >
+                        <Copy size={14} />
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      No painel da Pagar.me, vá em Configurações → Webhooks e cadastre esta URL.
+                      Marque os eventos: order.paid, charge.paid, charge.antifraude_approved (aprovação manual),
+                      charge.refunded, charge.chargeback, chargeback.received.
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">Taxa Boleto (R$)</label>
-                  <input type="number" step="0.01" className={inputClass} value={data.settings.taxBoleto} onChange={(e) => setData({ ...data, settings: { ...data.settings, taxBoleto: Number(e.target.value) } })} />
+              )}
+
+              {selectedGateway === 'asaas' && (
+                <div className="space-y-4 pt-2 border-t border-purple-900/30">
+                  <p className="text-sm text-gray-300 font-medium">Asaas</p>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Chave de API</label>
+                    <div className="relative">
+                      <input
+                        type={showAsaasKey ? 'text' : 'password'}
+                        className={`${inputClass} pr-10`}
+                        placeholder="$aact_..."
+                        value={data.settings.asaasApiKey || ''}
+                        onChange={(e) =>
+                          setData({ ...data, settings: { ...data.settings, asaasApiKey: e.target.value } })
+                        }
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowAsaasKey((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                        aria-label={showAsaasKey ? 'Ocultar chave' : 'Mostrar chave'}
+                      >
+                        {showAsaasKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="rounded-lg bg-purple-900/20 border border-purple-700/30 px-4 py-3 text-sm text-purple-200">
+                    O Asaas informa o líquido exato pela API; na Pagar.me usamos esta tabela.
+                  </div>
                 </div>
+              )}
+
+              <div className="space-y-4 pt-4 border-t border-purple-900/30">
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1">Taxa Gateway (R$)</label>
-                  <input type="number" step="0.01" className={inputClass} value={data.settings.taxGateway} onChange={(e) => setData({ ...data, settings: { ...data.settings, taxGateway: Number(e.target.value) } })} />
+                  <p className="text-sm text-gray-300 font-medium">Taxas (cálculo do valor a receber)</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    O Asaas informa o líquido exato pela API; na Pagar.me usamos esta tabela.
+                  </p>
                 </div>
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">Taxa Antifraude (R$)</label>
-                  <input type="number" step="0.01" className={inputClass} value={data.settings.taxAntifraude} onChange={(e) => setData({ ...data, settings: { ...data.settings, taxAntifraude: Number(e.target.value) } })} />
-                </div>
-              </div>
-              <div>
-                <p className="text-sm text-gray-300 font-medium mb-3">CET do Cartão (%)</p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const).map((n) => {
-                    const key = `taxCard${n}x` as keyof typeof data.settings
-                    return (
-                      <div key={n}>
-                        <label className="block text-xs text-gray-400 mb-1">{n}x</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          className={inputClass}
-                          value={data.settings[key] as number}
-                          onChange={(e) => setData({ ...data, settings: { ...data.settings, [key]: Number(e.target.value) } })}
-                        />
-                      </div>
-                    )
-                  })}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">PIX (%)</label>
+                    <input type="number" step="0.01" className={inputClass} value={data.settings.taxPix} onChange={(e) => setData({ ...data, settings: { ...data.settings, taxPix: Number(e.target.value) } })} />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Boleto pago (R$)</label>
+                    <input type="number" step="0.01" className={inputClass} value={data.settings.taxBoleto} onChange={(e) => setData({ ...data, settings: { ...data.settings, taxBoleto: Number(e.target.value) } })} />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Gateway por transação (R$)</label>
+                    <input type="number" step="0.01" className={inputClass} value={data.settings.taxGateway} onChange={(e) => setData({ ...data, settings: { ...data.settings, taxGateway: Number(e.target.value) } })} />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Antifraude por transação (R$)</label>
+                    <input type="number" step="0.01" className={inputClass} value={data.settings.taxAntifraude} onChange={(e) => setData({ ...data, settings: { ...data.settings, taxAntifraude: Number(e.target.value) } })} />
+                  </div>
                 </div>
               </div>
             </>
@@ -559,21 +643,39 @@ export default function ConfiguracoesPage() {
             </>
           )}
 
+          {tab === 'parcelamentos' && (
+            <>
+              <p className="text-sm text-gray-300 font-medium">
+                CET do cartão por nº de parcelas (%) — inclui antecipação
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const).map((n) => {
+                  const key = `taxCard${n}x` as keyof typeof data.settings
+                  return (
+                    <div key={n}>
+                      <label className="block text-xs text-gray-400 mb-1">
+                        {n === 1 ? 'À vista (1x)' : `${n}x`}
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        className={inputClass}
+                        value={data.settings[key] as number}
+                        onChange={(e) =>
+                          setData({ ...data, settings: { ...data.settings, [key]: Number(e.target.value) } })
+                        }
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
+
           <button type="submit" disabled={saving} className="w-full py-3 rounded-lg gradient-brand text-white font-semibold disabled:opacity-50">
             {saving ? 'Salvando...' : 'Salvar configurações'}
           </button>
         </form>
-      )}
-
-      {tab === 'parcelamentos' && (
-        <div className="bg-[var(--admin-panel-bg,#1a1030)] rounded-xl border border-purple-900/30 p-6">
-          <p className="text-gray-400 text-sm mb-4">
-            Gerencie as regras de parcelamento globais e por oferta.
-          </p>
-          <a href="/admin/parcelamentos" className="text-purple-400 hover:underline text-sm">
-            Abrir página de parcelamentos →
-          </a>
-        </div>
       )}
 
       {tab === 'funcionarios' && (
