@@ -8,7 +8,7 @@ import { MetaModal } from '@/components/admin/MetaModal'
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession()
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [config, setConfig] = useState<{
     brandName: string
     logoUrl?: string
@@ -52,6 +52,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }, [])
 
+  // Fecha drawer mobile ao redimensionar para desktop
+  useEffect(() => {
+    function onResize() {
+      if (window.innerWidth >= 1024) setMobileSidebarOpen(false)
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   if (status === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--admin-bg)]">
@@ -66,32 +75,30 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div
-      className="min-h-screen bg-[var(--admin-bg)] text-[var(--admin-text)]"
+      className="min-h-screen bg-[var(--admin-bg)] text-[var(--admin-text)] flex"
       style={{ ['--brand-color' as string]: config.brandColor || '#7c3aed' }}
     >
       <Suspense fallback={null}>
         <Sidebar
-          open={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
+          mobileOpen={mobileSidebarOpen}
+          onMobileClose={() => setMobileSidebarOpen(false)}
           brandName={config.brandName}
           logoUrl={config.logoUrl}
           userEmail={session.user?.email ?? undefined}
         />
       </Suspense>
 
-      <div className="flex flex-col min-h-screen lg:ml-[200px]">
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen">
         <header className="h-14 border-b border-[var(--admin-border)] flex items-center px-4 sticky top-0 bg-[var(--admin-bg)] z-30">
-          {/* Hambúrguer — apenas mobile */}
           <button
             type="button"
-            onClick={() => setSidebarOpen(true)}
+            onClick={() => setMobileSidebarOpen(true)}
             className="lg:hidden text-[var(--admin-muted)] hover:text-[var(--admin-text)] p-2 rounded-lg shrink-0 mr-2"
             aria-label="Abrir menu"
           >
             <Menu size={22} />
           </button>
 
-          {/* Centro: meta + email */}
           <div className="flex-1 flex items-center justify-center gap-4 min-w-0">
             <MetaModal
               currentGoal={config.monthlyGoal}
@@ -109,7 +116,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </span>
           </div>
 
-          {/* Tema — direita */}
           <button
             type="button"
             onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}

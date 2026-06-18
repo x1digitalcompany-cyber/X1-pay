@@ -23,9 +23,12 @@ import {
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
+const SIDEBAR_WIDTH = 'w-[200px]'
+
 interface SidebarProps {
-  open: boolean
-  onClose: () => void
+  /** Apenas mobile: drawer aberto */
+  mobileOpen: boolean
+  onMobileClose: () => void
   brandName: string
   logoUrl?: string
   userEmail?: string
@@ -100,8 +103,10 @@ function SidebarNav({
     }
     const base = href.split('?')[0]
     if (base === '/admin/vendedores') {
-      return pathname === '/admin/vendedores' ||
+      return (
+        pathname === '/admin/vendedores' ||
         (pathname.startsWith('/admin/vendedores/') && !pathname.includes('/roleta'))
+      )
     }
     return pathname === base || pathname.startsWith(base + '/')
   }
@@ -124,9 +129,9 @@ function SidebarNav({
                 onClick={() => toggleExpand(item.label)}
                 className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-[var(--admin-muted)] hover:bg-purple-900/20 hover:text-[var(--admin-text)] transition"
               >
-                <div className="flex items-center gap-3">
-                  <item.icon size={18} />
-                  <span className="text-sm">{item.label}</span>
+                <div className="flex items-center gap-3 min-w-0">
+                  <item.icon size={18} className="shrink-0" />
+                  <span className="text-sm truncate">{item.label}</span>
                 </div>
                 <ChevronDown size={14} className={cn('transition-transform shrink-0', isExp && 'rotate-180')} />
               </button>
@@ -171,8 +176,8 @@ function SidebarNav({
                 : 'text-[var(--admin-muted)] hover:bg-purple-900/20 hover:text-[var(--admin-text)]'
             )}
           >
-            <item.icon size={18} />
-            {item.label}
+            <item.icon size={18} className="shrink-0" />
+            <span className="truncate">{item.label}</span>
           </Link>
         )
       })}
@@ -182,7 +187,7 @@ function SidebarNav({
 
 function SidebarHeader({ brandName, logoUrl }: { brandName: string; logoUrl?: string }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-4 border-b border-purple-900/30">
+    <div className="flex items-center gap-3 px-4 py-4 border-b border-purple-900/30 shrink-0">
       <div className="w-10 h-10 rounded-full bg-purple-900/40 border border-purple-700/50 flex items-center justify-center overflow-hidden shrink-0">
         {logoUrl ? (
           <img src={logoUrl} alt="" className="w-full h-full object-cover" />
@@ -201,7 +206,7 @@ function SidebarHeader({ brandName, logoUrl }: { brandName: string; logoUrl?: st
 
 function SidebarFooter({ userEmail }: { userEmail?: string }) {
   return (
-    <div className="border-t border-purple-900/30 p-4 space-y-2">
+    <div className="border-t border-purple-900/30 p-4 space-y-2 shrink-0">
       {userEmail && (
         <p className="text-xs text-[var(--admin-muted)] truncate" title={userEmail}>
           {userEmail}
@@ -219,39 +224,94 @@ function SidebarFooter({ userEmail }: { userEmail?: string }) {
   )
 }
 
-export function Sidebar({ open, onClose, brandName, logoUrl, userEmail }: SidebarProps) {
-  const pathname = usePathname()
+function SidebarPanel({
+  brandName,
+  logoUrl,
+  userEmail,
+  pathname,
+  onNavigate,
+  showClose,
+  onClose,
+  className,
+}: {
+  brandName: string
+  logoUrl?: string
+  userEmail?: string
+  pathname: string
+  onNavigate?: () => void
+  showClose?: boolean
+  onClose?: () => void
+  className?: string
+}) {
+  return (
+    <aside
+      className={cn(
+        SIDEBAR_WIDTH,
+        'shrink-0 flex flex-col bg-[var(--sidebar-bg)] border-r border-purple-900/30 h-full',
+        className
+      )}
+    >
+      <div className="relative shrink-0">
+        <SidebarHeader brandName={brandName} logoUrl={logoUrl} />
+        {showClose && onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-4 right-3 text-[var(--admin-muted)] hover:text-[var(--admin-text)]"
+            aria-label="Fechar menu"
+          >
+            <X size={20} />
+          </button>
+        )}
+      </div>
+      <SidebarNav pathname={pathname} onNavigate={onNavigate} />
+      <SidebarFooter userEmail={userEmail} />
+    </aside>
+  )
+}
 
-  const asideClass =
-    'fixed left-0 top-0 h-full w-[200px] bg-[var(--sidebar-bg)] z-50 flex flex-col border-r border-purple-900/30'
+export function Sidebar({
+  mobileOpen,
+  onMobileClose,
+  brandName,
+  logoUrl,
+  userEmail,
+}: SidebarProps) {
+  const pathname = usePathname()
 
   return (
     <>
-      {/* Desktop: sempre visível */}
-      <aside className={cn(asideClass, 'hidden lg:flex')}>
-        <SidebarHeader brandName={brandName} logoUrl={logoUrl} />
-        <SidebarNav pathname={pathname} />
-        <SidebarFooter userEmail={userEmail} />
-      </aside>
+      {/* Desktop (≥1024px): permanente, fixa à esquerda, sem colapsar */}
+      <div className={cn('hidden lg:flex', SIDEBAR_WIDTH, 'shrink-0 sticky top-0 h-screen z-40')}>
+        <SidebarPanel
+          brandName={brandName}
+          logoUrl={logoUrl}
+          userEmail={userEmail}
+          pathname={pathname}
+          className="h-screen"
+        />
+      </div>
 
-      {/* Mobile: overlay + drawer */}
-      {open && (
+      {/* Mobile (<1024px): drawer sob demanda */}
+      {mobileOpen && (
         <>
-          <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={onClose} />
-          <aside className={cn(asideClass, 'lg:hidden shadow-xl')}>
-            <div className="relative">
-              <SidebarHeader brandName={brandName} logoUrl={logoUrl} />
-              <button
-                type="button"
-                onClick={onClose}
-                className="absolute top-4 right-3 text-[var(--admin-muted)] hover:text-[var(--admin-text)]"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <SidebarNav pathname={pathname} onNavigate={onClose} />
-            <SidebarFooter userEmail={userEmail} />
-          </aside>
+          <div
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            onClick={onMobileClose}
+            aria-hidden
+          />
+          <div className="fixed inset-y-0 left-0 z-50 lg:hidden">
+            <SidebarPanel
+              brandName={brandName}
+              logoUrl={logoUrl}
+              userEmail={userEmail}
+              pathname={pathname}
+              onNavigate={onMobileClose}
+              showClose
+              onClose={onMobileClose}
+              className="h-full shadow-xl"
+            />
+          </div>
         </>
       )}
     </>
