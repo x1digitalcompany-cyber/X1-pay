@@ -1,4 +1,49 @@
 import axios from 'axios'
+import { prisma } from './prisma'
+
+export async function dispatchLogisticsIfEnabled(orderId: string, userId: string) {
+  const settings = await prisma.settings.findUnique({ where: { userId } })
+  if (
+    !settings?.logisticsEnabled ||
+    !settings.logisticsApiUrl ||
+    !settings.logisticsApiKey ||
+    !settings.logisticsOrigin
+  ) return
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { checkout: { include: { product: true } } },
+  })
+  if (!order?.zipCode) return
+
+  try {
+    await send123LogOrder({
+      apiUrl: settings.logisticsApiUrl,
+      apiKey: settings.logisticsApiKey,
+      origin: settings.logisticsOrigin,
+      order: {
+        externalId: order.id,
+        customerName: order.customerName,
+        customerPhone: order.customerPhone || undefined,
+        customerEmail: order.customerEmail || undefined,
+        cpf: order.customerCpf || undefined,
+        zipCode: order.zipCode,
+        street: order.street || '',
+        number: order.number || '',
+        complement: order.complement || undefined,
+        neighborhood: order.neighborhood || '',
+        city: order.city || '',
+        state: order.state || '',
+        productName: order.offerName,
+        productCode: order.checkout?.product?.logisticsId || undefined,
+        quantity: 1,
+        value: order.value,
+      },
+    })
+  } catch (err) {
+    console.error('Logistics auto-dispatch failed:', err)
+  }
+}
 
 export async function send123LogOrder(params: {
   apiUrl: string

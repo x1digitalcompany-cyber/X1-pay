@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendPushToUser } from '@/lib/push'
 import { dispatchWebhook } from '@/lib/webhook'
+import { dispatchLogisticsIfEnabled } from '@/lib/logistica'
 import crypto from 'crypto'
 
 export async function POST(req: NextRequest) {
@@ -12,13 +13,14 @@ export async function POST(req: NextRequest) {
 
     if (secret) {
       const expected = crypto.createHmac('sha256', secret).update(rawBody).digest('hex')
-      if (signature && signature !== expected) {
+      // Reject if signature is missing OR does not match
+      if (!signature || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
         return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
       }
     }
 
     const body = JSON.parse(rawBody)
-    const eventType = body.type
+    const eventType: string = body.type ?? ''
     const data = body.data
 
     if (!data?.id) {
@@ -45,11 +47,7 @@ export async function POST(req: NextRequest) {
       newStatus = 'PAID'
       await prisma.order.update({
         where: { id: order.id },
-        data: {
-          status: 'PAID',
-          gatewayStatus: 'paid',
-          paidAt: new Date(),
-        },
+        data: { status: 'PAID', gatewayStatus: 'paid', paidAt: new Date() },
       })
     } else if (eventType === 'charge.refunded' || data.status === 'refunded') {
       newStatus = 'REFUNDED'
@@ -84,12 +82,15 @@ export async function POST(req: NextRequest) {
     if (!updated) return NextResponse.json({ received: true })
 
     if (newStatus === 'PAID') {
-      await sendPushToUser(order.userId, {
-        title: '💰 Novo pedido pago!',
-        body: `${updated.customerName} • R$ ${updated.value.toFixed(2)} (${updated.paymentMethod})`,
-        url: `/admin/pedidos/${updated.id}`,
-      })
-      await dispatchWebhook(order.userId, 'order.paid', updated)
+      await Promise.allSettled([
+        sendPushToUser(order.userId, {
+          title: '💰 Novo pedido pago!',
+          body: `${updated.customerName} • R$ ${updated.value.toFixed(2)} (${updated.paymentMethod})`,
+          url: `/admin/pedidos/${updated.id}`,
+        }),
+        dispatchWebhook(order.userId, 'order.paid', updated),
+        dispatchLogisticsIfEnabled(order.id, order.userId),
+      ])
     }
     if (newStatus === 'REFUNDED') {
       await dispatchWebhook(order.userId, 'order.refunded', updated)

@@ -42,7 +42,7 @@ export default function NovoPedidoPage() {
       body: JSON.stringify({
         ...form,
         sellerId: form.sellerId || null,
-        netValue: form.value * 0.9,
+        netValue: form.value,
       }),
     })
     setLoading(false)

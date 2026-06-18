@@ -35,8 +35,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Vendedor e valor obrigatórios' }, { status: 400 })
   }
 
-  const seller = await prisma.seller.findFirst({ where: { id: sellerId, userId } })
+  const seller = await prisma.seller.findFirst({
+    where: { id: sellerId, userId },
+    include: { orders: { where: { status: { in: ['PAID', 'CONFIRMED'] } } } },
+  })
   if (!seller) return NextResponse.json({ error: 'Vendedor não encontrado' }, { status: 404 })
+
+  const commissionEarned = seller.orders.reduce(
+    (sum, o) => sum + o.value * (seller.commission / 100),
+    0
+  )
+  const existingWithdrawals = await prisma.withdrawal.aggregate({
+    where: { sellerId, userId, status: { in: ['PENDING', 'PAID'] } },
+    _sum: { amount: true },
+  })
+  const totalWithdrawn = existingWithdrawals._sum.amount ?? 0
+  const available = parseFloat((commissionEarned - totalWithdrawn).toFixed(2))
+
+  if (Number(amount) > available) {
+    return NextResponse.json(
+      { error: `Saldo insuficiente. Disponível: R$ ${available.toFixed(2)}` },
+      { status: 400 }
+    )
+  }
 
   const withdrawal = await prisma.withdrawal.create({
     data: { userId, sellerId, amount: Number(amount), notes },

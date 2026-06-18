@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import { StepDadosPessoais } from '@/components/checkout/StepDadosPessoais'
 import { StepEntrega } from '@/components/checkout/StepEntrega'
 import { StepPagamento } from '@/components/checkout/StepPagamento'
@@ -24,6 +24,8 @@ interface CheckoutData {
 
 export default function CheckoutPage() {
   const { slug } = useParams<{ slug: string }>()
+  const searchParams = useSearchParams()
+  const sellerId = searchParams.get('seller') || searchParams.get('src') || undefined
   const [checkout, setCheckout] = useState<CheckoutData | null>(null)
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(true)
@@ -84,6 +86,7 @@ export default function CheckoutPage() {
       body: JSON.stringify({
         ...form,
         couponCode: appliedCoupon?.code ?? null,
+        sellerId: sellerId ?? null,
       }),
     })
     const data = await res.json()
