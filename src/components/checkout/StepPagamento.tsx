@@ -97,40 +97,65 @@ export function StepPagamento({
     'w-full px-4 py-3 rounded-lg bg-white border border-gray-200 text-gray-900 focus:outline-none focus:border-purple-500'
 
   if (result) {
+    const isPaid = result.status === 'PAID'
+
     return (
       <div className="space-y-6 text-center">
-        <h2 className="text-xl font-semibold text-gray-900">
-          {result.status === 'PAID' ? 'Pagamento confirmado!' : 'Aguardando pagamento'}
-        </h2>
-
-        {result.pixQrCode && (
+        {isPaid ? (
           <div className="space-y-4">
-            <img src={result.pixQrCode} alt="QR Code PIX" className="mx-auto w-48 h-48" />
-            {result.pixCode && (
-              <button
-                onClick={copyPix}
-                className="flex items-center justify-center gap-2 mx-auto px-4 py-2 rounded-lg bg-purple-100 text-purple-700 text-sm"
-              >
-                {copied ? <Check size={16} /> : <Copy size={16} />}
-                Copiar código PIX
-              </button>
+            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto">
+              <Check size={32} className="text-green-600" />
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900">Pagamento confirmado!</h2>
+            <p className="text-gray-500 text-sm">Seu pedido foi recebido e está sendo processado.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold text-gray-900">Aguardando pagamento</h2>
+
+            {result.pixQrCode && (
+              <div className="space-y-4">
+                <img
+                  src={result.pixQrCode}
+                  alt="QR Code PIX"
+                  className="mx-auto w-48 h-48 rounded-lg border border-gray-100"
+                />
+                {result.pixCode && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-gray-500">Ou copie o código abaixo:</p>
+                    <button
+                      onClick={copyPix}
+                      className="flex items-center justify-center gap-2 mx-auto px-4 py-2 rounded-lg bg-purple-100 text-purple-700 text-sm font-medium hover:bg-purple-200 transition"
+                    >
+                      {copied ? <Check size={16} /> : <Copy size={16} />}
+                      {copied ? 'Copiado!' : 'Copiar código PIX'}
+                    </button>
+                  </div>
+                )}
+                <p className="text-xs text-gray-400 flex items-center justify-center gap-1">
+                  <span className="inline-block w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
+                  Aguardando confirmação do pagamento...
+                </p>
+              </div>
+            )}
+
+            {result.boletoUrl && (
+              <div className="space-y-3">
+                <a
+                  href={result.boletoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block px-6 py-3 rounded-lg bg-purple-600 text-white font-semibold hover:bg-purple-700 transition"
+                >
+                  Baixar boleto
+                </a>
+                {result.boletoBarCode && (
+                  <p className="text-xs text-gray-500 break-all font-mono">{result.boletoBarCode}</p>
+                )}
+                <p className="text-xs text-gray-400">O boleto vence em 3 dias úteis.</p>
+              </div>
             )}
           </div>
-        )}
-
-        {result.boletoUrl && (
-          <a
-            href={result.boletoUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block px-6 py-3 rounded-lg gradient-brand text-white font-semibold"
-          >
-            Baixar boleto
-          </a>
-        )}
-
-        {result.boletoBarCode && (
-          <p className="text-xs text-gray-500 break-all">{result.boletoBarCode}</p>
         )}
       </div>
     )

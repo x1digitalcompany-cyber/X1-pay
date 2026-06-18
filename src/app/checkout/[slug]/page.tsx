@@ -30,6 +30,7 @@ export default function CheckoutPage() {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [orderId, setOrderId] = useState<string | null>(null)
   const [result, setResult] = useState<{
     pixCode?: string
     pixQrCode?: string
@@ -74,6 +75,32 @@ export default function CheckoutPage() {
       .finally(() => setLoading(false))
   }, [slug])
 
+  useEffect(() => {
+    if (!orderId || !result || result.status === 'PAID') return
+    if (form.paymentMethod === 'CARD') return
+
+    let attempts = 0
+    const maxAttempts = 60 // 5 min (60 × 5s)
+
+    const interval = setInterval(async () => {
+      attempts++
+      try {
+        const res = await fetch(`/api/checkout/status/${orderId}`)
+        if (!res.ok) return
+        const data = await res.json()
+        if (data.status === 'PAID' || data.status === 'CONFIRMED') {
+          clearInterval(interval)
+          setResult((prev) => ({ ...prev!, status: 'PAID' }))
+        }
+      } catch {
+        // silencioso
+      }
+      if (attempts >= maxAttempts) clearInterval(interval)
+    }, 5000)
+
+    return () => clearInterval(interval)
+  }, [orderId, result?.status, form.paymentMethod])
+
   function updateForm(field: string, value: unknown) {
     setForm((prev) => ({ ...prev, [field]: value }))
   }
@@ -98,6 +125,7 @@ export default function CheckoutPage() {
     }
 
     setResult(data)
+    setOrderId(data.orderId ?? null)
   }
 
   if (loading) {
