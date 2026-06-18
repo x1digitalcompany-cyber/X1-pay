@@ -9,6 +9,7 @@ interface Seller {
   id: string
   name: string
   email: string | null
+  phone: string | null
   commissionRate: number
   isActive: boolean
   totalSales: number
@@ -158,9 +159,9 @@ export default function VendedoresPage() {
                     <tr className="text-[var(--admin-muted)] border-b border-[var(--admin-border)]">
                       <th className="text-left p-4">Nome</th>
                       <th className="text-left p-4">Email</th>
+                      <th className="text-left p-4">Telefone</th>
                       <th className="text-left p-4">Comissão</th>
                       <th className="text-left p-4">Status</th>
-                      <th className="text-right p-4">Vendas</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -172,13 +173,13 @@ export default function VendedoresPage() {
                           </Link>
                         </td>
                         <td className="p-4 text-[var(--admin-muted)]">{seller.email || '—'}</td>
+                        <td className="p-4 text-[var(--admin-muted)]">{seller.phone || '—'}</td>
                         <td className="p-4 text-[var(--admin-muted)]">{seller.commissionRate}%</td>
                         <td className="p-4">
                           <span className={cn('text-xs px-2 py-0.5 rounded-full', seller.isActive ? 'bg-green-900/40 text-green-400' : 'bg-gray-800 text-gray-400')}>
                             {seller.isActive ? 'Ativo' : 'Inativo'}
                           </span>
                         </td>
-                        <td className="p-4 text-right text-[var(--admin-text)]">{formatCurrency(seller.totalSales)}</td>
                       </tr>
                     ))}
                   </tbody>

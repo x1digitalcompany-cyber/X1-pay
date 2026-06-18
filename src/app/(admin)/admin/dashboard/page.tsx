@@ -69,7 +69,8 @@ export default function DashboardPage() {
   }
 
   const conv = data.conversionByMethod[convTab] ?? { paid: 0, total: 0 }
-  const convDisplay = conv.total === 0 ? '—' : `${conv.paid}/${conv.total} pagos`
+  const convDisplay = '—'
+  const convSubtext = `${conv.paid}/${conv.total} pagos`
   const chargebackDisplay = data.chargebacks === 0 ? '—' : `${data.chargebackRate?.toFixed(1)}%`
   const refundDisplay = data.refunds === 0 ? '—' : `${data.refundRate?.toFixed(1)}%`
 
@@ -92,7 +93,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-[var(--admin-panel-bg)] rounded-xl border border-[var(--admin-border)] p-5">
           <p className="text-[var(--admin-muted)] text-sm">A receber (líquido)</p>
           <p className="text-2xl font-bold text-[var(--admin-text)] mt-1">
@@ -133,6 +134,7 @@ export default function DashboardPage() {
             ))}
           </div>
           <p className="text-xl font-bold text-[var(--admin-text)]">{convDisplay}</p>
+          <p className="text-xs text-[var(--admin-muted)] mt-2">{convSubtext}</p>
         </div>
 
         <div className="bg-[var(--admin-panel-bg)] rounded-xl border border-[var(--admin-border)] p-5">

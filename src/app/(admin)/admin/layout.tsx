@@ -1,7 +1,7 @@
 'use client'
 import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { Sidebar } from '@/components/admin/Sidebar'
 import { Menu, Moon, Sun } from 'lucide-react'
 import { MetaModal } from '@/components/admin/MetaModal'
@@ -66,22 +66,32 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div
-      className="min-h-screen bg-[var(--admin-bg)] text-[var(--admin-text)] flex"
+      className="min-h-screen bg-[var(--admin-bg)] text-[var(--admin-text)]"
       style={{ ['--brand-color' as string]: config.brandColor || '#7c3aed' }}
     >
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Suspense fallback={null}>
+        <Sidebar
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          brandName={config.brandName}
+          logoUrl={config.logoUrl}
+          userEmail={session.user?.email ?? undefined}
+        />
+      </Suspense>
 
-      <div className="flex-1 flex flex-col min-h-screen w-full">
-        <header className="h-14 border-b border-[var(--admin-border)] flex items-center px-4 sticky top-0 bg-[var(--admin-bg)] z-30 gap-3">
+      <div className="flex flex-col min-h-screen lg:ml-[200px]">
+        <header className="h-14 border-b border-[var(--admin-border)] flex items-center px-4 sticky top-0 bg-[var(--admin-bg)] z-30">
+          {/* Hambúrguer — apenas mobile */}
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
-            className="text-[var(--admin-muted)] hover:text-[var(--admin-text)] p-2 rounded-lg shrink-0"
+            className="lg:hidden text-[var(--admin-muted)] hover:text-[var(--admin-text)] p-2 rounded-lg shrink-0 mr-2"
             aria-label="Abrir menu"
           >
             <Menu size={22} />
           </button>
 
+          {/* Centro: meta + email */}
           <div className="flex-1 flex items-center justify-center gap-4 min-w-0">
             <MetaModal
               currentGoal={config.monthlyGoal}
@@ -94,11 +104,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 if (res.ok) setConfig((prev) => ({ ...prev, monthlyGoal: goal }))
               }}
             />
-            <span className="text-sm text-[var(--admin-muted)] truncate max-w-[240px] hidden sm:inline">
+            <span className="text-sm text-[var(--admin-muted)] truncate max-w-[280px]">
               {session.user?.email}
             </span>
           </div>
 
+          {/* Tema — direita */}
           <button
             type="button"
             onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}

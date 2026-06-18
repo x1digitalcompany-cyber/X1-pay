@@ -1,9 +1,9 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { toast } from 'sonner'
-import { Trash2, Plus, Loader2 } from 'lucide-react'
+import { Trash2, Plus, Loader2, X, ImageIcon } from 'lucide-react'
 
 interface Employee {
   id: string
@@ -28,6 +28,8 @@ interface WebhookLogEntry {
 export default function ConfiguracoesPage() {
   const searchParams = useSearchParams()
   const tab = searchParams.get('tab') || 'geral'
+  const logoInputRef = useRef<HTMLInputElement>(null)
+  const [logoUploading, setLogoUploading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [data, setData] = useState({
@@ -342,30 +344,60 @@ export default function ConfiguracoesPage() {
                 <input className={inputClass} value={data.brandName} onChange={(e) => setData({ ...data, brandName: e.target.value })} />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Logo</label>
-                {data.logoUrl && (
-                  <img src={data.logoUrl} alt="Logo" className="h-16 mb-2 rounded border border-purple-900/30" />
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="text-sm text-gray-400"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0]
-                    if (!file) return
-                    const fd = new FormData()
-                    fd.append('file', file)
-                    const res = await fetch('/api/upload', { method: 'POST', body: fd })
-                    if (res.ok) {
-                      const { url } = await res.json()
-                      setData({ ...data, logoUrl: url })
-                      toast.success('Logo enviado!')
-                    }
-                  }}
-                />
-                <div className="flex gap-2 mt-2">
-                  <button type="button" onClick={() => document.querySelector<HTMLInputElement>('input[type=file]')?.click()} className="text-xs text-purple-400">Trocar imagem</button>
-                  <button type="button" onClick={() => setData({ ...data, logoUrl: '' })} className="text-xs text-red-400">Remover imagem</button>
+                <label className="block text-sm text-gray-400 mb-3">Logo</label>
+                <div className="flex items-center gap-4">
+                  <div className="relative shrink-0">
+                    <div className="w-20 h-20 rounded-full bg-purple-900/30 border-2 border-purple-700/50 flex items-center justify-center overflow-hidden">
+                      {data.logoUrl ? (
+                        <img src={data.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                      ) : (
+                        <ImageIcon size={28} className="text-purple-600" />
+                      )}
+                    </div>
+                    {data.logoUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setData({ ...data, logoUrl: '' })}
+                        className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-red-600 text-white flex items-center justify-center hover:bg-red-500 shadow"
+                        title="Remover imagem"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <input
+                      ref={logoInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        setLogoUploading(true)
+                        const fd = new FormData()
+                        fd.append('file', file)
+                        const res = await fetch('/api/upload', { method: 'POST', body: fd })
+                        setLogoUploading(false)
+                        if (res.ok) {
+                          const { url } = await res.json()
+                          setData({ ...data, logoUrl: url })
+                          toast.success('Logo atualizado!')
+                        } else {
+                          toast.error('Erro no upload')
+                        }
+                        e.target.value = ''
+                      }}
+                    />
+                    <button
+                      type="button"
+                      disabled={logoUploading}
+                      onClick={() => logoInputRef.current?.click()}
+                      className="px-4 py-2 rounded-lg border border-purple-700/50 text-purple-300 text-sm hover:bg-purple-900/30 transition disabled:opacity-50"
+                    >
+                      {logoUploading ? 'Enviando...' : 'Trocar imagem'}
+                    </button>
+                  </div>
                 </div>
               </div>
               <div>
