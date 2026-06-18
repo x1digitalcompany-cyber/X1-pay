@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { maskCep, fetchAddressByCep } from '@/lib/utils'
 
 interface StepEntregaProps {
@@ -17,13 +17,22 @@ interface StepEntregaProps {
   onBack: () => void
 }
 
-export function StepEntrega({ data, onChange, onNext, onBack }: StepEntregaProps) {
+export function StepEntrega({ data, onChange, onNext }: StepEntregaProps) {
   const [loadingCep, setLoadingCep] = useState(false)
+  const [noNumber, setNoNumber] = useState(false)
 
-  async function handleCepChange(cep: string) {
-    const masked = maskCep(cep)
+  const labelClass = 'block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1'
+  const inputClass =
+    'w-full px-4 py-3 rounded-lg bg-white border border-gray-200 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-100 transition text-base'
+
+  useEffect(() => {
+    if (noNumber) onChange('number', 'S/N')
+  }, [noNumber]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleCepChange(value: string) {
+    const masked = maskCep(value)
     onChange('zipCode', masked)
-    const clean = cep.replace(/\D/g, '')
+    const clean = value.replace(/\D/g, '')
     if (clean.length === 8) {
       setLoadingCep(true)
       const address = await fetchAddressByCep(clean)
@@ -42,58 +51,108 @@ export function StepEntrega({ data, onChange, onNext, onBack }: StepEntregaProps
     onNext()
   }
 
-  const inputClass =
-    'w-full px-4 py-3 rounded-lg bg-white border border-gray-200 text-gray-900 focus:outline-none focus:border-purple-500'
-
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <h2 className="text-xl font-semibold text-gray-900">Endereço de entrega</h2>
+      {/* CEP + Cidade */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className={labelClass}>
+            CEP {loadingCep && <span className="text-purple-500 normal-case font-normal">buscando...</span>}
+          </label>
+          <input
+            className={inputClass}
+            placeholder="00000-000"
+            value={data.zipCode}
+            onChange={(e) => handleCepChange(e.target.value)}
+            required
+          />
+        </div>
+        <div>
+          <label className={labelClass}>Cidade</label>
+          <input
+            className={inputClass}
+            value={data.city}
+            onChange={(e) => onChange('city', e.target.value)}
+            required
+          />
+        </div>
+      </div>
+
+      {/* Estado */}
       <div>
-        <label className="block text-sm text-gray-600 mb-1">CEP {loadingCep && <span className="text-purple-500">buscando...</span>}</label>
+        <label className={labelClass}>Estado (UF)</label>
         <input
           className={inputClass}
-          value={data.zipCode}
-          onChange={(e) => handleCepChange(e.target.value)}
-          placeholder="00000-000"
+          value={data.state}
+          onChange={(e) => onChange('state', e.target.value.toUpperCase())}
+          maxLength={2}
           required
         />
       </div>
-      <div className="grid grid-cols-3 gap-3">
-        <div className="col-span-2">
-          <label className="block text-sm text-gray-600 mb-1">Rua</label>
-          <input className={inputClass} value={data.street} onChange={(e) => onChange('street', e.target.value)} required />
-        </div>
-        <div>
-          <label className="block text-sm text-gray-600 mb-1">Número</label>
-          <input className={inputClass} value={data.number} onChange={(e) => onChange('number', e.target.value)} required />
-        </div>
-      </div>
+
+      {/* Endereço */}
       <div>
-        <label className="block text-sm text-gray-600 mb-1">Complemento</label>
-        <input className={inputClass} value={data.complement} onChange={(e) => onChange('complement', e.target.value)} />
+        <label className={labelClass}>Endereço</label>
+        <input
+          className={inputClass}
+          placeholder="Rua, Avenida..."
+          value={data.street}
+          onChange={(e) => onChange('street', e.target.value)}
+          required
+        />
       </div>
+
+      {/* Número */}
       <div>
-        <label className="block text-sm text-gray-600 mb-1">Bairro</label>
-        <input className={inputClass} value={data.neighborhood} onChange={(e) => onChange('neighborhood', e.target.value)} required />
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        <div className="col-span-2">
-          <label className="block text-sm text-gray-600 mb-1">Cidade</label>
-          <input className={inputClass} value={data.city} onChange={(e) => onChange('city', e.target.value)} required />
+        <label className={labelClass}>Número</label>
+        <div className="flex items-center gap-3">
+          <input
+            className={`${inputClass} flex-1`}
+            value={noNumber ? 'S/N' : data.number}
+            onChange={(e) => onChange('number', e.target.value)}
+            disabled={noNumber}
+            required={!noNumber}
+          />
+          <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer whitespace-nowrap select-none">
+            <input
+              type="checkbox"
+              checked={noNumber}
+              onChange={(e) => setNoNumber(e.target.checked)}
+              className="rounded accent-purple-600"
+            />
+            Sem número
+          </label>
         </div>
-        <div>
-          <label className="block text-sm text-gray-600 mb-1">UF</label>
-          <input className={inputClass} value={data.state} onChange={(e) => onChange('state', e.target.value)} maxLength={2} required />
-        </div>
       </div>
-      <div className="flex gap-3">
-        <button type="button" onClick={onBack} className="flex-1 py-3 rounded-lg border border-gray-300 text-gray-700 font-medium">
-          Voltar
-        </button>
-        <button type="submit" className="flex-1 py-3 rounded-lg gradient-brand text-white font-semibold">
-          Continuar
-        </button>
+
+      {/* Bairro */}
+      <div>
+        <label className={labelClass}>Bairro</label>
+        <input
+          className={inputClass}
+          value={data.neighborhood}
+          onChange={(e) => onChange('neighborhood', e.target.value)}
+          required
+        />
       </div>
+
+      {/* Complemento */}
+      <div>
+        <label className={labelClass}>Complemento</label>
+        <input
+          className={inputClass}
+          placeholder="Apto, bloco, referência..."
+          value={data.complement}
+          onChange={(e) => onChange('complement', e.target.value)}
+        />
+      </div>
+
+      <button
+        type="submit"
+        className="w-full py-3.5 rounded-xl bg-green-500 hover:bg-green-600 text-white font-semibold text-sm transition"
+      >
+        continuar →
+      </button>
     </form>
   )
 }

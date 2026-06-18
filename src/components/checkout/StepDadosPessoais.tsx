@@ -1,5 +1,6 @@
 'use client'
-import { maskCpf, maskPhone } from '@/lib/utils'
+import { useState } from 'react'
+import { maskPhone } from '@/lib/utils'
 
 interface StepDadosPessoaisProps {
   checkoutSlug: string
@@ -7,13 +8,18 @@ interface StepDadosPessoaisProps {
     customerName: string
     customerEmail: string
     customerPhone: string
-    customerCpf: string
   }
   onChange: (field: string, value: string) => void
   onNext: () => void
 }
 
 export function StepDadosPessoais({ checkoutSlug, data, onChange, onNext }: StepDadosPessoaisProps) {
+  const [noEmail, setNoEmail] = useState(false)
+
+  const labelClass = 'block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1'
+  const inputClass =
+    'w-full px-4 py-3 rounded-lg bg-white border border-gray-200 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-100 transition text-base'
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (data.customerName && (data.customerEmail || data.customerPhone)) {
@@ -31,53 +37,66 @@ export function StepDadosPessoais({ checkoutSlug, data, onChange, onNext }: Step
     onNext()
   }
 
-  const inputClass =
-    'w-full px-4 py-3 rounded-lg bg-white border border-gray-200 text-gray-900 focus:outline-none focus:border-purple-500'
+  function handleNoEmail(checked: boolean) {
+    setNoEmail(checked)
+    if (checked) onChange('customerEmail', 'sem-email@x1pay.com')
+    else onChange('customerEmail', '')
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <h2 className="text-xl font-semibold text-gray-900">Seus dados</h2>
+      {/* Nome */}
       <div>
-        <label className="block text-sm text-gray-600 mb-1">Nome completo</label>
+        <label className={labelClass}>Nome Completo</label>
         <input
           className={inputClass}
+          placeholder="Seu nome completo"
           value={data.customerName}
           onChange={(e) => onChange('customerName', e.target.value)}
           required
         />
       </div>
+
+      {/* E-mail */}
       <div>
-        <label className="block text-sm text-gray-600 mb-1">Email</label>
+        <label className={labelClass}>E-mail</label>
         <input
-          type="email"
+          type={noEmail ? 'text' : 'email'}
           className={inputClass}
-          value={data.customerEmail}
+          placeholder={noEmail ? '—' : 'Digite seu e-mail'}
+          value={noEmail ? '' : data.customerEmail}
           onChange={(e) => onChange('customerEmail', e.target.value)}
-          required
+          disabled={noEmail}
+          required={!noEmail}
         />
+        <label className="flex items-center gap-2 mt-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={noEmail}
+            onChange={(e) => handleNoEmail(e.target.checked)}
+            className="rounded accent-purple-600"
+          />
+          <span className="text-xs text-gray-500">Não tenho e-mail</span>
+        </label>
       </div>
+
+      {/* Celular */}
       <div>
-        <label className="block text-sm text-gray-600 mb-1">Telefone</label>
+        <label className={labelClass}>Celular / WhatsApp</label>
         <input
           className={inputClass}
+          placeholder="(00) 00000-0000"
           value={data.customerPhone}
           onChange={(e) => onChange('customerPhone', maskPhone(e.target.value))}
-          placeholder="(00) 00000-0000"
           required
         />
       </div>
-      <div>
-        <label className="block text-sm text-gray-600 mb-1">CPF</label>
-        <input
-          className={inputClass}
-          value={data.customerCpf}
-          onChange={(e) => onChange('customerCpf', maskCpf(e.target.value))}
-          placeholder="000.000.000-00"
-          required
-        />
-      </div>
-      <button type="submit" className="w-full py-3 rounded-lg gradient-brand text-white font-semibold">
-        Continuar
+
+      <button
+        type="submit"
+        className="w-full py-3.5 rounded-xl bg-green-500 hover:bg-green-600 text-white font-semibold text-sm transition"
+      >
+        continuar →
       </button>
     </form>
   )
