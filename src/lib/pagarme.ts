@@ -15,9 +15,15 @@ export interface CreateOrderParams {
   customer: {
     name: string
     email: string
-    phone?: string
     document?: string
     type: 'individual' | 'company'
+    phones?: {
+      mobile_phone?: {
+        country_code: string
+        area_code: string
+        number: string
+      }
+    }
   }
   items: Array<{
     amount: number

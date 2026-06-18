@@ -98,7 +98,6 @@ export default function CheckoutPage() {
     }
 
     setResult(data)
-    setStep(4)
   }
 
   if (loading) {
@@ -147,7 +146,7 @@ export default function CheckoutPage() {
         </div>
 
         <div className="lg:col-span-3">
-          {step < 4 && (
+          {step < 4 && !result && (
             <div className="flex gap-2 mb-6">
               {steps.map((s, i) => (
                 <div key={s} className="flex items-center gap-2 flex-1">
@@ -197,23 +196,6 @@ export default function CheckoutPage() {
                 onBack={() => setStep(2)}
                 onSubmit={handlePayment}
                 loading={submitting}
-                result={null}
-              />
-            )}
-            {step === 4 && result && (
-              <StepPagamento
-                slug={slug}
-                price={checkout.price}
-                maxInstallments={checkout.maxInstallments}
-                brandColor={checkout.brandColor}
-                data={form}
-                appliedCoupon={appliedCoupon}
-                onCouponApply={setAppliedCoupon}
-                onCouponRemove={() => setAppliedCoupon(null)}
-                onChange={updateForm}
-                onBack={() => setStep(3)}
-                onSubmit={handlePayment}
-                loading={false}
                 result={result}
               />
             )}

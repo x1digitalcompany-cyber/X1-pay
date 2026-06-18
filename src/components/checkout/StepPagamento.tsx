@@ -214,8 +214,8 @@ export function StepPagamento({
             onChange={(e) => onChange('card', { ...data.card, holderName: e.target.value })}
           />
           <div className="grid grid-cols-3 gap-2">
-            <input className={inputClass} placeholder="Mês" value={data.card.expMonth} onChange={(e) => onChange('card', { ...data.card, expMonth: e.target.value })} />
-            <input className={inputClass} placeholder="Ano" value={data.card.expYear} onChange={(e) => onChange('card', { ...data.card, expYear: e.target.value })} />
+            <input className={inputClass} placeholder="Mês" maxLength={2} value={data.card.expMonth} onChange={(e) => onChange('card', { ...data.card, expMonth: e.target.value.replace(/\D/g, '') })} />
+            <input className={inputClass} placeholder="Ano (2026)" maxLength={4} value={data.card.expYear} onChange={(e) => onChange('card', { ...data.card, expYear: e.target.value.replace(/\D/g, '') })} />
             <input className={inputClass} placeholder="CVV" value={data.card.cvv} onChange={(e) => onChange('card', { ...data.card, cvv: e.target.value })} />
           </div>
           <select

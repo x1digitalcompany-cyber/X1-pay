@@ -13,8 +13,14 @@ export async function POST(req: NextRequest) {
 
     if (secret) {
       const expected = crypto.createHmac('sha256', secret).update(rawBody).digest('hex')
-      // Reject if signature is missing OR does not match
-      if (!signature || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
+      const sigBuf = Buffer.from(signature || '', 'utf8')
+      const expBuf = Buffer.from(expected, 'utf8')
+      // Reject if missing or length/content mismatch (timingSafeEqual requires equal-length buffers)
+      const valid =
+        signature.length > 0 &&
+        sigBuf.length === expBuf.length &&
+        crypto.timingSafeEqual(sigBuf, expBuf)
+      if (!valid) {
         return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
       }
     }

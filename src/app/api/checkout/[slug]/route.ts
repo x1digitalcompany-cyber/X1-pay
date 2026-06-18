@@ -7,7 +7,7 @@ import {
   getAsaasPixQrCode,
   mapAsaasStatus,
 } from '@/lib/asaas'
-import { addDays, format } from 'date-fns'
+import { addDays } from 'date-fns'
 
 export async function GET(
   req: NextRequest,
@@ -158,6 +158,18 @@ export async function POST(
 
   const gateway = settings?.gateway || 'pagarme'
 
+  function parsePhone(phone?: string) {
+    if (!phone) return undefined
+    const digits = phone.replace(/\D/g, '')
+    if (digits.length < 10) return undefined
+    return { country_code: '55', area_code: digits.slice(0, 2), number: digits.slice(2) }
+  }
+
+  function normalizeExpYear(year: string): number {
+    const y = year.replace(/\D/g, '')
+    return parseInt(y.length === 2 ? `20${y}` : y, 10)
+  }
+
   // --- Pagar.me ---
   if (gateway === 'pagarme') {
     const secretKey = settings?.pagarmeSecretKey || process.env.PAGARME_SECRET_KEY
@@ -184,7 +196,7 @@ export async function POST(
           payment_method: 'boleto',
           boleto: {
             instructions: 'Pagar até o vencimento',
-            due_at: format(addDays(new Date(), 3), "yyyy-MM-dd'T'HH:mm:ss'Z'"),
+            due_at: addDays(new Date(), 3).toISOString(),
           },
         })
       } else if (body.card) {
@@ -197,21 +209,23 @@ export async function POST(
               number: body.card.number.replace(/\D/g, ''),
               holder_name: body.card.holderName,
               exp_month: parseInt(body.card.expMonth, 10),
-              exp_year: parseInt(body.card.expYear, 10),
+              exp_year: normalizeExpYear(body.card.expYear),
               cvv: body.card.cvv,
             },
           },
         })
       }
 
+      const mobilePhone = parsePhone(body.customerPhone)
+
       const pagarmeOrder = await createPagarmeOrder({
         secretKey,
         customer: {
           name: body.customerName,
           email: body.customerEmail || 'cliente@email.com',
-          phone: body.customerPhone?.replace(/\D/g, ''),
           document: body.customerCpf?.replace(/\D/g, ''),
           type: 'individual',
+          ...(mobilePhone ? { phones: { mobile_phone: mobilePhone } } : {}),
         },
         items: [
           {
@@ -241,6 +255,11 @@ export async function POST(
 
       const charge = pagarmeOrder.charges?.[0]
       const lastTransaction = charge?.last_transaction
+
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[Pagar.me] charge:', JSON.stringify(charge, null, 2))
+        console.log('[Pagar.me] lastTransaction:', JSON.stringify(lastTransaction, null, 2))
+      }
 
       const updateData: Record<string, string | undefined> = {
         gatewayId: pagarmeOrder.id,
