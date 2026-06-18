@@ -307,7 +307,6 @@ export default function ConfiguracoesPage() {
     { id: 'geral', label: 'Geral', href: '/admin/configuracoes' },
     { id: 'pagamento', label: 'Pagamento', href: '/admin/configuracoes?tab=pagamento' },
     { id: 'logistica', label: 'Logística', href: '/admin/configuracoes?tab=logistica' },
-    { id: 'parcelamentos', label: 'Parcelamentos', href: '/admin/configuracoes?tab=parcelamentos' },
     { id: 'track', label: 'Luminar Track', href: '/admin/configuracoes?tab=track' },
     { id: 'dashboard', label: 'Dashboard Luminar', href: '/admin/configuracoes?tab=dashboard' },
     { id: 'funcionarios', label: 'Funcionários', href: '/admin/configuracoes?tab=funcionarios' },
@@ -323,7 +322,7 @@ export default function ConfiguracoesPage() {
     )
   }
 
-  const settingsTabs = ['geral', 'pagamento', 'logistica', 'parcelamentos', 'track', 'dashboard']
+  const settingsTabs = ['geral', 'pagamento', 'logistica', 'track', 'dashboard']
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -334,15 +333,13 @@ export default function ConfiguracoesPage() {
         </p>
       )}
 
-      <div className="flex overflow-x-auto whitespace-nowrap border-b border-[var(--admin-border)] mb-6 gap-1 pb-0">
+      <div className="flex flex-wrap gap-1 border-b border-purple-900/30 pb-2 mb-6">
         {tabs.map((t) => (
           <a
             key={t.id}
             href={t.href}
-            className={`px-4 py-2 text-sm font-medium shrink-0 rounded-t transition-colors ${
-              tab === t.id
-                ? 'bg-purple-600 text-white'
-                : 'text-[var(--admin-muted)] hover:text-[var(--admin-text)]'
+            className={`px-3 py-2 rounded-lg text-sm transition ${
+              tab === t.id ? 'bg-purple-700 text-white' : 'text-gray-400 hover:text-white'
             }`}
           >
             {t.label}
@@ -581,6 +578,33 @@ export default function ConfiguracoesPage() {
                   </div>
                 </div>
               </div>
+
+              <div className="pt-4 border-t border-purple-900/30">
+                <p className="text-sm text-gray-300 font-medium mb-3">
+                  CET do cartão por nº de parcelas (%) — inclui antecipação
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const).map((n) => {
+                    const key = `taxCard${n}x` as keyof typeof data.settings
+                    return (
+                      <div key={n}>
+                        <label className="block text-xs text-gray-400 mb-1">
+                          {n === 1 ? 'À vista (1x)' : `${n}x`}
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className={inputClass}
+                          value={data.settings[key] as number}
+                          onChange={(e) =>
+                            setData({ ...data, settings: { ...data.settings, [key]: Number(e.target.value) } })
+                          }
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
             </>
           )}
 
@@ -639,35 +663,6 @@ export default function ConfiguracoesPage() {
               <div>
                 <label className="block text-sm text-gray-400 mb-1">URL do Dashboard Luminar (com ?secret=)</label>
                 <input type="password" className={inputClass} value={data.settings.luminarDashboardUrl || ''} onChange={(e) => setData({ ...data, settings: { ...data.settings, luminarDashboardUrl: e.target.value } })} />
-              </div>
-            </>
-          )}
-
-          {tab === 'parcelamentos' && (
-            <>
-              <p className="text-sm text-gray-300 font-medium">
-                CET do cartão por nº de parcelas (%) — inclui antecipação
-              </p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const).map((n) => {
-                  const key = `taxCard${n}x` as keyof typeof data.settings
-                  return (
-                    <div key={n}>
-                      <label className="block text-xs text-gray-400 mb-1">
-                        {n === 1 ? 'À vista (1x)' : `${n}x`}
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        className={inputClass}
-                        value={data.settings[key] as number}
-                        onChange={(e) =>
-                          setData({ ...data, settings: { ...data.settings, [key]: Number(e.target.value) } })
-                        }
-                      />
-                    </div>
-                  )
-                })}
               </div>
             </>
           )}

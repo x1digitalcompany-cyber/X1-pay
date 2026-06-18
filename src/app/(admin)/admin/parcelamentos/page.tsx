@@ -59,7 +59,7 @@ export default function ParcelamentosPage() {
           </p>
         </div>
         <Link
-          href="/admin/configuracoes?tab=parcelamentos"
+          href="/admin/configuracoes?tab=pagamento"
           className="text-sm text-purple-400 hover:underline whitespace-nowrap"
         >
           Editar em Configurações

@@ -66,7 +66,6 @@ const menuItems = [
       { href: '/admin/configuracoes', label: 'Geral' },
       { href: '/admin/configuracoes?tab=pagamento', label: 'Pagamento' },
       { href: '/admin/configuracoes?tab=logistica', label: 'Logística' },
-      { href: '/admin/configuracoes?tab=parcelamentos', label: 'Parcelamentos' },
       { href: '/admin/configuracoes?tab=track', label: 'Luminar Track' },
       { href: '/admin/configuracoes?tab=dashboard', label: 'Dashboard Luminar' },
       { href: '/admin/configuracoes?tab=funcionarios', label: 'Funcionários' },
