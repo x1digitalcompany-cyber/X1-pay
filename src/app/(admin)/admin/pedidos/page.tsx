@@ -7,10 +7,9 @@ import {
   SlidersHorizontal,
   X,
   ShoppingCart,
-  ChevronLeft,
-  ChevronRight,
+  Eye,
 } from 'lucide-react'
-import { cn, formatCurrency, formatDate, getOrderStatusLabel, getOrderStatusColor } from '@/lib/utils'
+import { cn, formatCurrency, getOrderStatusLabel, getOrderStatusColor } from '@/lib/utils'
 
 interface Order {
   id: string
@@ -88,6 +87,13 @@ function buildParams(filters: Filters, page: number): URLSearchParams {
   if (filters.dateField && filters.dateField !== 'createdAt') p.set('dateField', filters.dateField)
   if (page > 1) p.set('page', String(page))
   return p
+}
+
+function fmtDate(iso: string) {
+  const d = new Date(iso)
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
+    ', ' +
+    d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
 
 const paymentLabels: Record<string, string> = { PIX: 'PIX', CARD: 'Cartão', BOLETO: 'Boleto' }
@@ -208,66 +214,61 @@ export default function PedidosPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <button
-              type="button"
-              onClick={() => { setDraft(applied); setDrawerOpen(true) }}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--admin-border)] text-[var(--admin-text)] text-sm hover:bg-purple-900/20 mt-1"
-            >
-              <SlidersHorizontal size={16} /> Filtros
-            </button>
-            <div>
-              <h1 className="text-2xl font-bold text-[var(--admin-text)]">Pedidos</h1>
-              <p className="text-[var(--admin-muted)] text-sm mt-1">
-                {isTodayOnly
-                  ? `Mostrando hoje (${todayLabel()}). Use os filtros para ver outros dias.`
-                  : `${total} pedido${total !== 1 ? 's' : ''} encontrado${total !== 1 ? 's' : ''}`}
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <a
-              href={exportHref}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--admin-border)] text-[var(--admin-muted)] text-sm hover:text-[var(--admin-text)] transition whitespace-nowrap"
-            >
-              Exportar planilha
-            </a>
-            <Link
-              href="/admin/pedidos/importar-rastreios"
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--admin-border)] text-[var(--admin-muted)] text-sm hover:text-[var(--admin-text)] transition whitespace-nowrap"
-            >
-              Importar rastreios
-            </Link>
-            <Link
-              href="/admin/pedidos/novo"
-              className="flex items-center gap-2 px-4 py-2 rounded-lg gradient-brand text-white text-sm font-medium whitespace-nowrap"
-            >
-              <Plus size={16} /> Novo pedido
-            </Link>
-          </div>
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--admin-text)]">Pedidos</h1>
+          <p className="text-[var(--admin-muted)] text-sm mt-1">
+            {isTodayOnly
+              ? `Mostrando hoje (${todayLabel()}). Use os filtros para ver outros dias.`
+              : `Período: ${applied.from} — ${applied.to}`}
+          </p>
         </div>
-
-        {activeBadges.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {activeBadges.map((b) => (
-              <span
-                key={b.key}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-900/30 text-purple-300 text-xs"
-              >
-                {b.label}
-                <button type="button" onClick={b.onRemove}>
-                  <X size={12} />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => { setDraft(applied); setDrawerOpen(true) }}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--admin-border)] text-[var(--admin-text)] text-sm hover:bg-purple-900/20 transition"
+          >
+            <SlidersHorizontal size={15} /> Filtros
+          </button>
+          <a
+            href={exportHref}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--admin-border)] text-[var(--admin-text)] text-sm hover:bg-purple-900/20 transition"
+          >
+            Exportar planilha
+          </a>
+          <Link
+            href="/admin/pedidos/importar-rastreios"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--admin-border)] text-[var(--admin-text)] text-sm hover:bg-purple-900/20 transition"
+          >
+            Importar rastreios
+          </Link>
+          <Link
+            href="/admin/pedidos/novo"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg gradient-brand text-white text-sm font-medium"
+          >
+            <Plus size={15} /> Novo pedido
+          </Link>
+        </div>
       </div>
 
-      {/* Table */}
+      {/* ── Active filter badges ── */}
+      {activeBadges.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {activeBadges.map((b) => (
+            <span
+              key={b.key}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-900/30 text-purple-300 text-xs"
+            >
+              {b.label}
+              <button type="button" onClick={b.onRemove}><X size={12} /></button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* ── Table ── */}
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <div className="w-8 h-8 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
@@ -285,69 +286,80 @@ export default function PedidosPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-[var(--admin-muted)] border-b border-[var(--admin-border)]">
-                  <th className="text-left p-4 whitespace-nowrap">Cliente</th>
-                  <th className="text-left p-4 whitespace-nowrap">Vendedor</th>
-                  <th className="text-left p-4 whitespace-nowrap">Oferta</th>
-                  <th className="text-right p-4 whitespace-nowrap">Valor</th>
-                  <th className="text-right p-4 whitespace-nowrap">A receber</th>
-                  <th className="text-left p-4 whitespace-nowrap">Pagamento</th>
-                  <th className="text-left p-4 whitespace-nowrap">Rastreio</th>
-                  <th className="text-left p-4 whitespace-nowrap">Status</th>
-                  <th className="text-left p-4 whitespace-nowrap">Data</th>
-                  <th className="text-left p-4 whitespace-nowrap">Ações</th>
+                <tr className="text-[var(--admin-muted)] border-b border-[var(--admin-border)] text-xs uppercase tracking-wide">
+                  <th className="text-left p-3 font-medium">Cliente</th>
+                  <th className="text-left p-3 font-medium">Vendedor</th>
+                  <th className="text-left p-3 font-medium">Oferta</th>
+                  <th className="text-left p-3 font-medium">Valor</th>
+                  <th className="text-left p-3 font-medium">A receber</th>
+                  <th className="text-left p-3 font-medium">Pagamento</th>
+                  <th className="text-left p-3 font-medium">Rastreio</th>
+                  <th className="text-left p-3 font-medium">Status</th>
+                  <th className="text-left p-3 font-medium">Data</th>
+                  <th className="text-left p-3 font-medium">Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {orders.map((order) => (
-                  <tr key={order.id} className="border-b border-[var(--admin-border)]/50 hover:bg-purple-900/10">
-                    <td className="p-4">
-                      <p className="text-[var(--admin-text)] font-medium whitespace-nowrap">{order.customerName}</p>
-                      {order.customerPhone && (
-                        <p className="text-[var(--admin-muted)] text-xs mt-0.5">{order.customerPhone}</p>
-                      )}
+                  <tr
+                    key={order.id}
+                    onClick={() => router.push(`/admin/pedidos/${order.id}`)}
+                    className="border-b border-[var(--admin-border)]/50 hover:bg-purple-900/10 cursor-pointer"
+                  >
+                    <td className="p-3">
+                      <p className="text-[var(--admin-text)] text-sm font-medium leading-tight">
+                        {order.customerName}
+                      </p>
+                      <p className="text-[var(--admin-muted)] text-xs mt-0.5">
+                        {order.customerPhone || '·'}
+                      </p>
                     </td>
-                    <td className="p-4 text-[var(--admin-muted)] whitespace-nowrap">
+
+                    <td className="p-3 text-[var(--admin-muted)] text-sm">
                       {order.seller?.name || '—'}
                     </td>
-                    <td className="p-4 text-[var(--admin-muted)] max-w-[140px]">
+
+                    <td className="p-3 text-[var(--admin-muted)] text-sm max-w-[160px]">
                       <span className="truncate block">{order.offerName}</span>
                     </td>
-                    <td className="p-4 text-right text-[var(--admin-text)] whitespace-nowrap">
+
+                    <td className="p-3 text-[var(--admin-text)] text-sm">
                       {formatCurrency(order.value)}
                     </td>
-                    <td className="p-4 text-right text-purple-400 whitespace-nowrap">
-                      {formatCurrency(order.netValue)}
+
+                    <td className="p-3 text-sm">
+                      <span className={order.netValue > 0 ? 'text-green-400' : 'text-[var(--admin-muted)]'}>
+                        {formatCurrency(order.netValue ?? 0)}
+                      </span>
                     </td>
-                    <td className="p-4 text-[var(--admin-muted)] whitespace-nowrap">
+
+                    <td className="p-3 text-[var(--admin-muted)] text-sm whitespace-nowrap">
                       {paymentLabels[order.paymentMethod] ?? order.paymentMethod}
                       {order.installments > 1 && <span className="text-xs"> {order.installments}x</span>}
                     </td>
-                    <td className="p-4">
-                      {order.trackingCode ? (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-900/30 text-blue-400 whitespace-nowrap">
-                          {order.trackingCode}
-                        </span>
-                      ) : (
-                        <span className="text-[var(--admin-muted)] text-xs">—</span>
-                      )}
+
+                    <td className="p-3 text-[var(--admin-muted)] text-sm">
+                      {order.trackingCode || '—'}
                     </td>
-                    <td className={cn('p-4 whitespace-nowrap', getOrderStatusColor(order.status))}>
+
+                    <td className={cn('p-3 text-sm font-medium', getOrderStatusColor(order.status))}>
                       {getOrderStatusLabel(order.status)}
                     </td>
-                    <td className="p-4 text-[var(--admin-muted)] whitespace-nowrap">
-                      <p>{formatDate(order.createdAt)}</p>
+
+                    <td className="p-3 text-xs whitespace-nowrap">
+                      <p className="text-[var(--admin-muted)]">{fmtDate(order.createdAt)}</p>
                       {order.paidAt && (
-                        <p className="text-green-500 text-xs mt-0.5">pago {formatDate(order.paidAt, 'dd/MM/yy')}</p>
+                        <p className="text-green-400 mt-0.5">Pago {fmtDate(order.paidAt)}</p>
                       )}
                     </td>
-                    <td className="p-4">
+
+                    <td className="p-3" onClick={(e) => e.stopPropagation()}>
                       <button
-                        type="button"
                         onClick={() => router.push(`/admin/pedidos/${order.id}`)}
-                        className="text-purple-400 hover:text-purple-300 text-xs font-medium whitespace-nowrap"
+                        className="p-1.5 text-[var(--admin-muted)] hover:text-purple-400 transition rounded"
+                        title="Ver detalhes"
                       >
-                        Ver →
+                        <Eye size={16} />
                       </button>
                     </td>
                   </tr>
@@ -356,33 +368,30 @@ export default function PedidosPage() {
             </table>
           </div>
 
-          {pages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--admin-border)]">
-              <span className="text-sm text-[var(--admin-muted)]">
-                {total} pedidos · pág. {page} de {pages}
-              </span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="p-1.5 rounded-lg border border-[var(--admin-border)] text-[var(--admin-muted)] disabled:opacity-40"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                <button
-                  onClick={() => setPage((p) => Math.min(pages, p + 1))}
-                  disabled={page >= pages}
-                  className="p-1.5 rounded-lg border border-[var(--admin-border)] text-[var(--admin-muted)] disabled:opacity-40"
-                >
-                  <ChevronRight size={16} />
-                </button>
-              </div>
+          {/* ── Pagination footer ── */}
+          <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--admin-border)] text-xs text-[var(--admin-muted)]">
+            <span>{total} pedido(s) · página {page} de {Math.max(1, pages)}</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-1.5 rounded border border-[var(--admin-border)] disabled:opacity-40 text-sm hover:bg-purple-900/10 transition"
+              >
+                Anterior
+              </button>
+              <button
+                onClick={() => setPage((p) => Math.min(pages, p + 1))}
+                disabled={page >= pages}
+                className="px-3 py-1.5 rounded border border-[var(--admin-border)] disabled:opacity-40 text-sm hover:bg-purple-900/10 transition"
+              >
+                Próxima
+              </button>
             </div>
-          )}
+          </div>
         </div>
       )}
 
-      {/* Drawer */}
+      {/* ── Drawer ── */}
       {drawerOpen && (
         <>
           <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setDrawerOpen(false)} />
