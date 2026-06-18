@@ -256,14 +256,8 @@ export async function POST(
       const charge = pagarmeOrder.charges?.[0]
       const lastTransaction = charge?.last_transaction
 
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('[Pagar.me] charge:', JSON.stringify(charge, null, 2))
-        console.log('[Pagar.me] lastTransaction:', JSON.stringify(lastTransaction, null, 2))
-        if (paymentMethod === 'BOLETO') {
-          console.log('[Pagar.me] Boleto lastTransaction:', JSON.stringify(lastTransaction, null, 2))
-          console.log('[Pagar.me] Boleto charge completo:', JSON.stringify(charge, null, 2))
-        }
-      }
+      console.log('[Pagar.me] charge:', JSON.stringify(charge, null, 2))
+      console.log('[Pagar.me] lastTransaction:', JSON.stringify(lastTransaction, null, 2))
 
       const updateData: Record<string, string | undefined> = {
         gatewayId: pagarmeOrder.id,
@@ -274,18 +268,29 @@ export async function POST(
         updateData.pixCode = lastTransaction.qr_code
         updateData.pixQrCode = lastTransaction.qr_code_url
       }
-      if (paymentMethod === 'BOLETO' && lastTransaction) {
+      if (paymentMethod === 'BOLETO') {
+        const t = lastTransaction ?? {}
         updateData.boletoUrl =
-          lastTransaction.url ||
-          lastTransaction.pdf ||
-          lastTransaction.boleto_url ||
-          charge?.boleto_url ||
+          (t as Record<string, string>).url ||
+          (t as Record<string, string>).pdf ||
+          (charge as Record<string, string>)?.boleto_url ||
+          (charge as Record<string, string>)?.url ||
+          (pagarmeOrder as Record<string, string>)?.boleto_url ||
           undefined
+
         updateData.boletoBarCode =
-          lastTransaction.line ||
-          lastTransaction.boleto_barcode ||
-          charge?.boleto_barcode ||
+          (t as Record<string, string>).line ||
+          (t as Record<string, string>).boleto_barcode ||
+          (charge as Record<string, string>)?.boleto_barcode ||
+          (charge as Record<string, string>)?.line ||
+          (pagarmeOrder as Record<string, string>)?.boleto_barcode ||
           undefined
+
+        console.log('[BOLETO DEBUG] boletoUrl:', updateData.boletoUrl)
+        console.log('[BOLETO DEBUG] boletoBarCode:', updateData.boletoBarCode)
+        console.log('[BOLETO DEBUG] charge keys:', Object.keys(charge ?? {}))
+        console.log('[BOLETO DEBUG] lastTransaction keys:', Object.keys(lastTransaction ?? {}))
+        console.log('[BOLETO DEBUG] pagarmeOrder keys:', Object.keys(pagarmeOrder ?? {}))
       }
       if (paymentMethod === 'CARD' && lastTransaction?.card) {
         updateData.cardBrand = lastTransaction.card.brand
