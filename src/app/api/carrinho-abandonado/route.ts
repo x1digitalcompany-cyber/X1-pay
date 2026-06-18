@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions, getAdminUserId } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { startOfDay, endOfDay } from 'date-fns'
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
@@ -42,20 +43,28 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url)
   const search = searchParams.get('search')
+  const from = searchParams.get('from')
+  const to = searchParams.get('to')
+
+  const where: Record<string, unknown> = { userId }
+
+  if (search) {
+    where.OR = [
+      { name: { contains: search } },
+      { email: { contains: search } },
+      { phone: { contains: search } },
+    ]
+  }
+
+  if (from || to) {
+    const updatedAt: Record<string, Date> = {}
+    if (from) updatedAt.gte = startOfDay(new Date(from))
+    if (to) updatedAt.lte = endOfDay(new Date(to))
+    where.updatedAt = updatedAt
+  }
 
   const carts = await prisma.abandonedCart.findMany({
-    where: {
-      userId,
-      ...(search
-        ? {
-            OR: [
-              { name: { contains: search } },
-              { email: { contains: search } },
-              { phone: { contains: search } },
-            ],
-          }
-        : {}),
-    },
+    where,
     orderBy: { updatedAt: 'desc' },
   })
 

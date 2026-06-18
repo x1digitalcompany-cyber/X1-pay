@@ -20,6 +20,7 @@ export async function GET() {
     brandColor: user.brandColor,
     logoUrl: user.logoUrl,
     currency: user.currency,
+    defaultTax: user.defaultTax,
     maxInstallments: user.maxInstallments,
     settings: user.settings,
   })
@@ -31,11 +32,11 @@ export async function PUT(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const body = await req.json()
-  const { brandName, brandColor, logoUrl, currency, maxInstallments, settings } = body
+  const { brandName, brandColor, logoUrl, currency, defaultTax, maxInstallments, settings } = body
 
   await prisma.user.update({
     where: { id: userId },
-    data: { brandName, brandColor, logoUrl, currency, maxInstallments },
+    data: { brandName, brandColor, logoUrl, currency, defaultTax, maxInstallments },
   })
 
   if (settings) {

@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const { searchParams } = new URL(req.url)
-  const period = searchParams.get('period') || '30d'
+  const period = searchParams.get('period') || 'today'
   const fromParam = searchParams.get('from')
   const toParam = searchParams.get('to')
 
@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
   const monthStart = startOfMonth(now)
   const monthEnd = endOfMonth(now)
 
-  const [orders, settings, recentOrders, monthOrders] = await Promise.all([
+  const [orders, settings, recentOrders, monthOrders, ordersWithProduct] = await Promise.all([
     prisma.order.findMany({
       where: { userId, createdAt: { gte: start, lte: end } },
     }),
@@ -70,6 +70,14 @@ export async function GET(req: NextRequest) {
         createdAt: { gte: monthStart, lte: monthEnd },
         status: { in: PAID_STATUSES },
       },
+    }),
+    prisma.order.findMany({
+      where: {
+        userId,
+        createdAt: { gte: start, lte: end },
+        status: { in: PAID_STATUSES },
+      },
+      include: { checkout: { include: { product: true } } },
     }),
   ])
 
@@ -136,19 +144,62 @@ export async function GET(req: NextRequest) {
   const monthlyGoal = settings?.monthlyGoal ?? 0
   const monthlyNet = monthOrders.reduce((s, o) => s + o.netValue, 0)
 
+  const supplierCost = ordersWithProduct.reduce(
+    (s, o) => s + (o.checkout?.product?.unitCost ?? 0),
+    0
+  )
+
+  const conversionByMethod = {
+    CARD: { paid: 0, total: 0 },
+    PIX: { paid: 0, total: 0 },
+    BOLETO: { paid: 0, total: 0 },
+  } as Record<string, { paid: number; total: number }>
+
+  for (const o of orders) {
+    const key = o.paymentMethod
+    if (conversionByMethod[key]) {
+      conversionByMethod[key].total += 1
+      if (PAID_STATUSES.includes(o.status)) conversionByMethod[key].paid += 1
+    }
+  }
+
+  const chargebackRate =
+    paidOrders.length > 0 ? (chargebacks / paidOrders.length) * 100 : null
+  const refundRate =
+    paidOrders.length > 0 ? (refunds / paidOrders.length) * 100 : null
+
+  const netByPaymentMethod = {
+    PIX: byPaymentMethod.PIX.net,
+    CARD: byPaymentMethod.CARD.net,
+    BOLETO: byPaymentMethod.BOLETO.net,
+  }
+
   return NextResponse.json({
     grossRevenue,
     netRevenue,
     pendingRevenue,
+    supplierCost,
     totalOrders: orders.length,
     paidOrders: paidOrders.length,
+    pendingCount: pendingOrders.length,
     conversionRate,
+    conversionByMethod,
     chargebacks,
     refunds,
+    chargebackRate,
+    refundRate,
     byPaymentMethod,
+    netByPaymentMethod,
     salesByDay,
     salesByWeekday: weekdayBuckets,
-    recentOrders,
+    recentOrders: recentOrders.map((o) => ({
+      id: o.id,
+      customerName: o.customerName,
+      offerName: o.offerName,
+      value: o.value,
+      status: o.status,
+      createdAt: o.createdAt,
+    })),
     monthlyGoal,
     monthlyNet,
   })

@@ -55,6 +55,7 @@ export async function GET(req: NextRequest) {
         trackingCode: o.trackingCode,
         sellerName: o.seller?.name ?? null,
         productName: o.checkout?.product?.name ?? null,
+        productType: o.checkout?.product?.type ?? null,
         logisticPaid: !!logisticPaid,
         logisticPaidAmount: logisticPaid?.amount ?? 0,
       }

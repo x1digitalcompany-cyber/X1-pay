@@ -15,6 +15,9 @@ import {
   Banknote,
   Dices,
   Link2,
+  Calculator,
+  FileText,
+  CreditCard,
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -28,25 +31,19 @@ const menuItems = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/produtos', label: 'Produtos', icon: Package },
   { href: '/admin/pedidos', label: 'Pedidos', icon: ShoppingCart },
-  { href: '/admin/carrinho-abandonado', label: 'Carrinho abandonado', icon: ShoppingBag },
+  { href: '/admin/carrinhos', label: 'Carrinho abandonado', icon: ShoppingBag },
   {
     label: 'Vendedores',
     icon: Users,
     children: [
-      { href: '/admin/vendedores', label: 'Ranking' },
-      { href: '/admin/vendedores/lista', label: 'Todos' },
+      { href: '/admin/vendedores', label: 'Vendedores' },
       { href: '/admin/saques', label: 'Saques' },
-      { href: '/admin/roleta', label: 'Roleta' },
+      { href: '/admin/vendedores/roleta', label: 'Roleta de premiação' },
     ],
   },
-  {
-    label: 'Acerto logística',
-    icon: Truck,
-    children: [
-      { href: '/admin/acerto-logistica', label: 'Resumo' },
-      { href: '/admin/acerto-logistica/pagamentos', label: 'Pagamentos' },
-    ],
-  },
+  { href: '/admin/relatorios/logistica', label: 'Acerto logística', icon: Truck },
+  { href: '/admin/simulador', label: 'Simulador', icon: Calculator },
+  { href: '/admin/logs', label: 'Logs de webhook', icon: FileText },
   {
     label: 'Marketing',
     icon: Megaphone,
@@ -62,18 +59,19 @@ const menuItems = [
       { href: '/admin/configuracoes', label: 'Geral' },
       { href: '/admin/configuracoes?tab=pagamento', label: 'Pagamento' },
       { href: '/admin/configuracoes?tab=logistica', label: 'Logística' },
-      { href: '/admin/configuracoes?tab=rastreamento', label: 'Rastreamento' },
+      { href: '/admin/configuracoes?tab=parcelamentos', label: 'Parcelamentos' },
+      { href: '/admin/configuracoes?tab=track', label: 'Luminar Track' },
+      { href: '/admin/configuracoes?tab=dashboard', label: 'Dashboard Luminar' },
       { href: '/admin/configuracoes?tab=funcionarios', label: 'Funcionários' },
       { href: '/admin/configuracoes?tab=notificacoes', label: 'Notificações' },
       { href: '/admin/configuracoes?tab=seguranca', label: 'Segurança' },
-      { href: '/admin/configuracoes?tab=webhook', label: 'Webhook' },
     ],
   },
 ]
 
 export function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname()
-  const [expanded, setExpanded] = useState<string[]>(['Vendedores', 'Acerto logística', 'Marketing', 'Configurações'])
+  const [expanded, setExpanded] = useState<string[]>(['Vendedores', 'Marketing', 'Configurações'])
 
   function toggleExpand(label: string) {
     setExpanded((prev) =>
@@ -81,32 +79,35 @@ export function Sidebar({ open, onClose }: SidebarProps) {
     )
   }
 
+  function isActive(href: string) {
+    const base = href.split('?')[0]
+    if (base === '/admin/configuracoes') {
+      return pathname === '/admin/configuracoes'
+    }
+    return pathname === base || pathname.startsWith(base + '/')
+  }
+
   const iconMap: Record<string, typeof LayoutDashboard> = {
     Saques: Banknote,
-    Roleta: Dices,
+    'Roleta de premiação': Dices,
     'Gerar link': Link2,
+    Parcelamentos: CreditCard,
   }
+
+  if (!open) return null
 
   return (
     <>
-      {open && (
-        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={onClose} />
-      )}
+      <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} />
 
-      <aside
-        className={cn(
-          'fixed left-0 top-0 h-full w-64 bg-[var(--sidebar-bg)] z-50 flex flex-col transition-transform duration-300',
-          open ? 'translate-x-0' : '-translate-x-full',
-          'lg:translate-x-0'
-        )}
-      >
+      <aside className="fixed left-0 top-0 h-full w-64 bg-[var(--sidebar-bg)] z-50 flex flex-col shadow-xl">
         <div className="flex justify-end p-4">
-          <button onClick={onClose} className="text-[var(--admin-muted)] hover:text-[var(--admin-text)] lg:hidden">
+          <button onClick={onClose} className="text-[var(--admin-muted)] hover:text-[var(--admin-text)]">
             <X size={20} />
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-4 px-2">
+        <nav className="flex-1 overflow-y-auto py-2 px-2">
           {menuItems.map((item) => {
             if (item.children) {
               const isExp = expanded.includes(item.label)
@@ -133,7 +134,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                             onClick={onClose}
                             className={cn(
                               'flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition',
-                              pathname === child.href.split('?')[0]
+                              isActive(child.href)
                                 ? 'bg-purple-700 text-white'
                                 : 'text-[var(--admin-muted)] hover:text-[var(--admin-text)] hover:bg-purple-900/20'
                             )}
@@ -156,7 +157,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 onClick={onClose}
                 className={cn(
                   'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition',
-                  pathname === item.href
+                  isActive(item.href!)
                     ? 'bg-purple-700 text-white'
                     : 'text-[var(--admin-muted)] hover:bg-purple-900/20 hover:text-[var(--admin-text)]'
                 )}

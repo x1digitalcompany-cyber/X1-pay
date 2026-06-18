@@ -1,9 +1,11 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { formatCurrency } from '@/lib/utils'
-import { Trophy } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
+import { Plus, ChevronLeft, ChevronRight, Trophy, Users } from 'lucide-react'
+import { formatCurrency, cn } from '@/lib/utils'
 
-interface SellerRanking {
+interface Seller {
   id: string
   name: string
   email: string | null
@@ -14,57 +16,178 @@ interface SellerRanking {
   commissionEarned: number
 }
 
-export default function VendedoresRankingPage() {
-  const [sellers, setSellers] = useState<SellerRanking[]>([])
+function monthLabel(ym: string) {
+  const [y, m] = ym.split('-')
+  const months = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
+  return `${months[Number(m) - 1]} de ${y}`
+}
+
+export default function VendedoresPage() {
+  const searchParams = useSearchParams()
+  const period = searchParams.get('p') === 'dia' ? 'dia' : 'mes'
+  const [sellers, setSellers] = useState<Seller[]>([])
   const [loading, setLoading] = useState(true)
+  const [month, setMonth] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  })
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const params = new URLSearchParams({ period, month })
+    const data = await fetch(`/api/vendedores?${params}`).then((r) => r.json())
+    setSellers(Array.isArray(data) ? data : [])
+    setLoading(false)
+  }, [period, month])
 
   useEffect(() => {
-    fetch('/api/vendedores')
-      .then((r) => r.json())
-      .then(setSellers)
-      .finally(() => setLoading(false))
-  }, [])
+    load()
+  }, [load])
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
-      </div>
-    )
+  function shiftMonth(delta: number) {
+    const [y, m] = month.split('-').map(Number)
+    const d = new Date(y, m - 1 + delta, 1)
+    setMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
   }
 
-  return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-white">Ranking de vendedores</h1>
+  const top3 = sellers.slice(0, 3)
 
-      <div className="space-y-3">
-        {sellers.map((seller, index) => (
-          <div
-            key={seller.id}
-            className="bg-[#1a1030] rounded-xl border border-purple-900/30 p-5 flex items-center gap-4"
-          >
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-              index === 0 ? 'bg-yellow-500/20 text-yellow-400' :
-              index === 1 ? 'bg-gray-400/20 text-gray-300' :
-              index === 2 ? 'bg-orange-600/20 text-orange-400' :
-              'bg-purple-900/30 text-purple-400'
-            }`}>
-              {index < 3 ? <Trophy size={18} /> : index + 1}
-            </div>
-            <div className="flex-1">
-              <p className="text-white font-medium">{seller.name}</p>
-              <p className="text-gray-400 text-sm">{seller.orderCount} vendas · {seller.commissionRate}% comissão</p>
-            </div>
-            <div className="text-right">
-              <p className="text-white font-semibold">{formatCurrency(seller.totalSales)}</p>
-              <p className="text-purple-400 text-sm">Comissão: {formatCurrency(seller.commissionEarned)}</p>
-            </div>
-          </div>
-        ))}
-        {sellers.length === 0 && (
-          <p className="text-center text-gray-500 py-16">Nenhum vendedor cadastrado</p>
-        )}
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--admin-text)]">Vendedores</h1>
+          <p className="text-[var(--admin-muted)] text-sm mt-1">
+            Cadastre atendentes, libere ofertas e gerencie sua equipe.
+          </p>
+        </div>
+        <Link
+          href="/admin/vendedores/novo"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg gradient-brand text-white text-sm font-medium w-fit"
+        >
+          <Plus size={16} /> Novo vendedor
+        </Link>
       </div>
+
+      {sellers.length === 0 && !loading ? (
+        <div className="bg-[var(--admin-panel-bg)] rounded-xl border border-[var(--admin-border)] p-16 text-center">
+          <Users size={40} className="mx-auto mb-3 text-purple-700" />
+          <p className="text-[var(--admin-text)]">Nenhum vendedor cadastrado</p>
+          <p className="text-[var(--admin-muted)] text-sm mt-2">
+            Cadastre seu primeiro vendedor para gerar links com SRC e comissão.
+          </p>
+          <Link href="/admin/vendedores/novo" className="mt-4 inline-block text-purple-400 hover:underline text-sm">
+            Novo vendedor
+          </Link>
+        </div>
+      ) : (
+        <>
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex gap-1">
+                <Link
+                  href="/admin/vendedores?p=mes"
+                  className={cn(
+                    'px-3 py-1.5 rounded-lg text-sm',
+                    period === 'mes' ? 'bg-purple-700 text-white' : 'text-[var(--admin-muted)] border border-[var(--admin-border)]'
+                  )}
+                >
+                  Ranking do Mês
+                </Link>
+                <Link
+                  href="/admin/vendedores?p=dia"
+                  className={cn(
+                    'px-3 py-1.5 rounded-lg text-sm',
+                    period === 'dia' ? 'bg-purple-700 text-white' : 'text-[var(--admin-muted)] border border-[var(--admin-border)]'
+                  )}
+                >
+                  Ranking do Dia
+                </Link>
+              </div>
+              <div className="flex items-center gap-2 ml-auto">
+                <button type="button" onClick={() => shiftMonth(-1)} className="p-2 rounded-lg border border-[var(--admin-border)] text-[var(--admin-muted)]">
+                  <ChevronLeft size={16} />
+                </button>
+                <input
+                  type="month"
+                  value={month}
+                  onChange={(e) => setMonth(e.target.value)}
+                  className="px-3 py-1.5 rounded-lg bg-[var(--admin-panel-bg)] border border-[var(--admin-border)] text-[var(--admin-text)] text-sm"
+                />
+                <button type="button" onClick={() => shiftMonth(1)} className="p-2 rounded-lg border border-[var(--admin-border)] text-[var(--admin-muted)]">
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+            <p className="text-sm text-[var(--admin-muted)]">
+              Desempenho da equipe em pagamentos aprovados · {monthLabel(month)}
+            </p>
+
+            <h3 className="font-medium text-[var(--admin-text)]">Top 3</h3>
+            {top3.length === 0 ? (
+              <p className="text-[var(--admin-muted)] text-sm py-6 text-center border border-dashed border-[var(--admin-border)] rounded-xl">
+                Sem vendas no período selecionado
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {top3.map((seller, i) => (
+                  <div key={seller.id} className="bg-[var(--admin-panel-bg)] rounded-xl border border-[var(--admin-border)] p-5">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Trophy size={18} className={i === 0 ? 'text-yellow-400' : i === 1 ? 'text-gray-300' : 'text-orange-400'} />
+                      <span className="text-[var(--admin-muted)] text-sm">#{i + 1}</span>
+                    </div>
+                    <p className="text-[var(--admin-text)] font-medium">{seller.name}</p>
+                    <p className="text-[var(--admin-muted)] text-sm">{seller.orderCount} vendas</p>
+                    <p className="text-lg font-bold text-[var(--admin-text)] mt-2">{formatCurrency(seller.totalSales)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-4">
+            <h3 className="font-medium text-[var(--admin-text)]">Todos os vendedores</h3>
+            {loading ? (
+              <div className="flex justify-center py-12">
+                <div className="w-8 h-8 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
+              </div>
+            ) : (
+              <div className="bg-[var(--admin-panel-bg)] rounded-xl border border-[var(--admin-border)] overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-[var(--admin-muted)] border-b border-[var(--admin-border)]">
+                      <th className="text-left p-4">Nome</th>
+                      <th className="text-left p-4">Email</th>
+                      <th className="text-left p-4">Comissão</th>
+                      <th className="text-left p-4">Status</th>
+                      <th className="text-right p-4">Vendas</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sellers.map((seller) => (
+                      <tr key={seller.id} className="border-b border-[var(--admin-border)]/50 hover:bg-purple-900/10">
+                        <td className="p-4">
+                          <Link href={`/admin/vendedores/${seller.id}`} className="text-[var(--admin-text)] hover:text-purple-400">
+                            {seller.name}
+                          </Link>
+                        </td>
+                        <td className="p-4 text-[var(--admin-muted)]">{seller.email || '—'}</td>
+                        <td className="p-4 text-[var(--admin-muted)]">{seller.commissionRate}%</td>
+                        <td className="p-4">
+                          <span className={cn('text-xs px-2 py-0.5 rounded-full', seller.isActive ? 'bg-green-900/40 text-green-400' : 'bg-gray-800 text-gray-400')}>
+                            {seller.isActive ? 'Ativo' : 'Inativo'}
+                          </span>
+                        </td>
+                        <td className="p-4 text-right text-[var(--admin-text)]">{formatCurrency(seller.totalSales)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </>
+      )}
     </div>
   )
 }

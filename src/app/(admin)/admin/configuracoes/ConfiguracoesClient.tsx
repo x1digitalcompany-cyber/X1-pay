@@ -36,9 +36,11 @@ export default function ConfiguracoesPage() {
     logoUrl: '',
     currency: 'BRL',
     maxInstallments: 12,
+    defaultTax: 0,
     settings: {
       gateway: 'pagarme',
       pagarmeSecretKey: '',
+      asaasApiKey: '',
       taxPix: 0.69,
       taxBoleto: 2.99,
       taxGateway: 0.35,
@@ -92,6 +94,7 @@ export default function ConfiguracoesPage() {
           brandColor: res.brandColor || '#7c3aed',
           logoUrl: res.logoUrl || '',
           currency: res.currency || 'BRL',
+          defaultTax: res.defaultTax ?? 0,
           maxInstallments: res.maxInstallments || 12,
           settings: { ...prev.settings, ...res.settings },
         }))
@@ -289,11 +292,12 @@ export default function ConfiguracoesPage() {
     { id: 'geral', label: 'Geral', href: '/admin/configuracoes' },
     { id: 'pagamento', label: 'Pagamento', href: '/admin/configuracoes?tab=pagamento' },
     { id: 'logistica', label: 'Logística', href: '/admin/configuracoes?tab=logistica' },
-    { id: 'rastreamento', label: 'Rastreamento', href: '/admin/configuracoes?tab=rastreamento' },
+    { id: 'parcelamentos', label: 'Parcelamentos', href: '/admin/configuracoes?tab=parcelamentos' },
+    { id: 'track', label: 'Luminar Track', href: '/admin/configuracoes?tab=track' },
+    { id: 'dashboard', label: 'Dashboard Luminar', href: '/admin/configuracoes?tab=dashboard' },
     { id: 'funcionarios', label: 'Funcionários', href: '/admin/configuracoes?tab=funcionarios' },
     { id: 'notificacoes', label: 'Notificações', href: '/admin/configuracoes?tab=notificacoes' },
     { id: 'seguranca', label: 'Segurança', href: '/admin/configuracoes?tab=seguranca' },
-    { id: 'webhook', label: 'Webhook', href: '/admin/configuracoes?tab=webhook' },
   ]
 
   if (loading) {
@@ -304,11 +308,16 @@ export default function ConfiguracoesPage() {
     )
   }
 
-  const settingsTabs = ['geral', 'pagamento', 'logistica', 'rastreamento', 'webhook']
+  const settingsTabs = ['geral', 'pagamento', 'logistica', 'track', 'dashboard']
 
   return (
     <div className="max-w-3xl space-y-6">
       <h1 className="text-2xl font-bold text-white">Configurações</h1>
+      {tab === 'geral' && (
+        <p className="text-sm text-gray-400 -mt-4">
+          Personalize a marca, a moeda e os parâmetros padrão da plataforma.
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-2 border-b border-purple-900/30 pb-2">
         {tabs.map((t) => (
@@ -333,29 +342,89 @@ export default function ConfiguracoesPage() {
                 <input className={inputClass} value={data.brandName} onChange={(e) => setData({ ...data, brandName: e.target.value })} />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Cor da marca</label>
-                <input type="color" className="w-16 h-10 rounded cursor-pointer" value={data.brandColor} onChange={(e) => setData({ ...data, brandColor: e.target.value })} />
+                <label className="block text-sm text-gray-400 mb-1">Logo</label>
+                {data.logoUrl && (
+                  <img src={data.logoUrl} alt="Logo" className="h-16 mb-2 rounded border border-purple-900/30" />
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="text-sm text-gray-400"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    const fd = new FormData()
+                    fd.append('file', file)
+                    const res = await fetch('/api/upload', { method: 'POST', body: fd })
+                    if (res.ok) {
+                      const { url } = await res.json()
+                      setData({ ...data, logoUrl: url })
+                      toast.success('Logo enviado!')
+                    }
+                  }}
+                />
+                <div className="flex gap-2 mt-2">
+                  <button type="button" onClick={() => document.querySelector<HTMLInputElement>('input[type=file]')?.click()} className="text-xs text-purple-400">Trocar imagem</button>
+                  <button type="button" onClick={() => setData({ ...data, logoUrl: '' })} className="text-xs text-red-400">Remover imagem</button>
+                </div>
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">URL do logo</label>
-                <input className={inputClass} value={data.logoUrl} onChange={(e) => setData({ ...data, logoUrl: e.target.value })} />
+                <label className="block text-sm text-gray-400 mb-1">Cor primária da marca</label>
+                <input type="color" className="w-16 h-10 rounded cursor-pointer" value={data.brandColor} onChange={(e) => setData({ ...data, brandColor: e.target.value })} />
+                <p className="text-xs text-gray-500 mt-1">
+                  Usada nos botões, destaques e gradiente da marca. Aplica em toda a interface após salvar.
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Moeda</label>
+                <select className={inputClass} value={data.currency} onChange={(e) => setData({ ...data, currency: e.target.value })}>
+                  <option value="BRL">BRL</option>
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Taxa padrão (%)</label>
+                <input type="number" step="0.01" className={inputClass} value={data.defaultTax} onChange={(e) => setData({ ...data, defaultTax: Number(e.target.value) })} />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Gateway de pagamento ativo</label>
+                <select className={inputClass} value={data.settings.gateway} onChange={(e) => setData({ ...data, settings: { ...data.settings, gateway: e.target.value } })}>
+                  <option value="pagarme">Pagar.me</option>
+                  <option value="asaas">Asaas</option>
+                </select>
               </div>
               <div>
                 <label className="block text-sm text-gray-400 mb-1">Máx. parcelas</label>
                 <input type="number" className={inputClass} value={data.maxInstallments} onChange={(e) => setData({ ...data, maxInstallments: Number(e.target.value) })} />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Meta mensal (R$)</label>
+                <input type="number" step="0.01" className={inputClass} value={data.settings.monthlyGoal} onChange={(e) => setData({ ...data, settings: { ...data.settings, monthlyGoal: Number(e.target.value) } })} />
               </div>
             </>
           )}
 
           {tab === 'pagamento' && (
             <>
+              <p className="text-sm text-gray-300 font-medium">Pagar.me</p>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Chave secreta Pagar.me</label>
+                <label className="block text-sm text-gray-400 mb-1">Chave privada</label>
                 <input
                   type="password"
                   className={inputClass}
                   value={data.settings.pagarmeSecretKey || ''}
                   onChange={(e) => setData({ ...data, settings: { ...data.settings, pagarmeSecretKey: e.target.value } })}
+                />
+              </div>
+              <p className="text-sm text-gray-300 font-medium pt-2">Asaas</p>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Chave de API</label>
+                <input
+                  type="password"
+                  className={inputClass}
+                  value={data.settings.asaasApiKey || ''}
+                  onChange={(e) => setData({ ...data, settings: { ...data.settings, asaasApiKey: e.target.value } })}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -377,7 +446,7 @@ export default function ConfiguracoesPage() {
                 </div>
               </div>
               <div>
-                <p className="text-sm text-gray-300 font-medium mb-3">Taxas de cartão por parcela (%)</p>
+                <p className="text-sm text-gray-300 font-medium mb-3">CET do Cartão (%)</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const).map((n) => {
                     const key = `taxCard${n}x` as keyof typeof data.settings
@@ -408,81 +477,53 @@ export default function ConfiguracoesPage() {
                   checked={data.settings.logisticsEnabled}
                   onChange={(e) => setData({ ...data, settings: { ...data.settings, logisticsEnabled: e.target.checked } })}
                 />
-                <label htmlFor="logisticsEnabled" className="text-sm text-gray-300">Habilitar logística</label>
+                <label htmlFor="logisticsEnabled" className="text-sm text-gray-300">Integração com a logística</label>
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">URL da API</label>
+                <label className="block text-sm text-gray-400 mb-1">Logística</label>
+                <select className={inputClass} value={data.settings.logisticsProvider || '123log'} onChange={(e) => setData({ ...data, settings: { ...data.settings, logisticsProvider: e.target.value } })}>
+                  <option value="123log">123 Log</option>
+                  <option value="">Nenhuma</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">URL base da API</label>
                 <input className={inputClass} value={data.settings.logisticsApiUrl || ''} onChange={(e) => setData({ ...data, settings: { ...data.settings, logisticsApiUrl: e.target.value } })} />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">API Key</label>
-                <input type="password" className={inputClass} value={data.settings.logisticsApiKey || ''} onChange={(e) => setData({ ...data, settings: { ...data.settings, logisticsApiKey: e.target.value } })} />
               </div>
               <div>
                 <label className="block text-sm text-gray-400 mb-1">Origem</label>
                 <input className={inputClass} value={data.settings.logisticsOrigin || ''} onChange={(e) => setData({ ...data, settings: { ...data.settings, logisticsOrigin: e.target.value } })} />
               </div>
-            </>
-          )}
-
-          {tab === 'rastreamento' && (
-            <>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">URL Luminar Track</label>
+                <label className="block text-sm text-gray-400 mb-1">Chave da API</label>
+                <input type="password" className={inputClass} value={data.settings.logisticsApiKey || ''} onChange={(e) => setData({ ...data, settings: { ...data.settings, logisticsApiKey: e.target.value } })} />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Chave postback/integração</label>
+                <input type="password" className={inputClass} value={data.settings.logisticsPostbackKey || ''} onChange={(e) => setData({ ...data, settings: { ...data.settings, logisticsPostbackKey: e.target.value } })} />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">URL webhook de rastreamento</label>
                 <input className={inputClass} value={data.settings.luminarTrackUrl || ''} onChange={(e) => setData({ ...data, settings: { ...data.settings, luminarTrackUrl: e.target.value } })} />
               </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Token postback Payt</label>
-                <input className={inputClass} value={data.settings.logisticsPostbackKey || ''} onChange={(e) => setData({ ...data, settings: { ...data.settings, logisticsPostbackKey: e.target.value } })} />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">URL dashboard Luminar</label>
-                <input className={inputClass} value={data.settings.luminarDashboardUrl || ''} onChange={(e) => setData({ ...data, settings: { ...data.settings, luminarDashboardUrl: e.target.value } })} />
-              </div>
-              <button
-                type="button"
-                onClick={testLuminar}
-                disabled={luminarTesting}
-                className="px-4 py-2 rounded-lg bg-purple-900/50 text-white text-sm disabled:opacity-50"
-              >
-                {luminarTesting ? 'Testando...' : 'Testar conexão Luminar'}
-              </button>
             </>
           )}
 
-          {tab === 'webhook' && (
+          {tab === 'track' && (
             <>
-              <p className="text-sm text-gray-400">
-                Quando um pedido for marcado como PAID, o sistema fará POST para esta URL com o objeto do pedido.
-              </p>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">URL do webhook de pedido pago</label>
-                <input className={inputClass} value={data.settings.webhookUrl || ''} onChange={(e) => setData({ ...data, settings: { ...data.settings, webhookUrl: e.target.value } })} />
+                <label className="block text-sm text-gray-400 mb-1">URL do Luminar Track (formato Payt)</label>
+                <input className={inputClass} value={data.settings.luminarTrackUrl || ''} onChange={(e) => setData({ ...data, settings: { ...data.settings, luminarTrackUrl: e.target.value } })} />
               </div>
-              <button
-                type="button"
-                onClick={testWebhook}
-                disabled={webhookTesting}
-                className="px-4 py-2 rounded-lg bg-purple-900/50 text-white text-sm disabled:opacity-50"
-              >
-                {webhookTesting ? 'Enviando...' : 'Testar webhook'}
-              </button>
-              {webhookLog.length > 0 && (
-                <div className="mt-4">
-                  <p className="text-sm text-gray-300 font-medium mb-2">Últimos disparos</p>
-                  <div className="space-y-2">
-                    {webhookLog.map((entry, i) => (
-                      <div key={i} className="flex justify-between text-sm bg-[#0f0a1e] rounded-lg px-3 py-2">
-                        <span className="text-gray-400">{entry.event}</span>
-                        <span className={entry.status >= 200 && entry.status < 300 ? 'text-green-400' : 'text-red-400'}>
-                          HTTP {entry.status}
-                        </span>
-                        <span className="text-gray-500">{new Date(entry.date).toLocaleString('pt-BR')}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+            </>
+          )}
+
+          {tab === 'dashboard' && (
+            <>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">URL do Dashboard Luminar (com ?secret=)</label>
+                <input type="password" className={inputClass} value={data.settings.luminarDashboardUrl || ''} onChange={(e) => setData({ ...data, settings: { ...data.settings, luminarDashboardUrl: e.target.value } })} />
+              </div>
             </>
           )}
 
@@ -490,6 +531,17 @@ export default function ConfiguracoesPage() {
             {saving ? 'Salvando...' : 'Salvar configurações'}
           </button>
         </form>
+      )}
+
+      {tab === 'parcelamentos' && (
+        <div className="bg-[var(--admin-panel-bg,#1a1030)] rounded-xl border border-purple-900/30 p-6">
+          <p className="text-gray-400 text-sm mb-4">
+            Gerencie as regras de parcelamento globais e por oferta.
+          </p>
+          <a href="/admin/parcelamentos" className="text-purple-400 hover:underline text-sm">
+            Abrir página de parcelamentos →
+          </a>
+        </div>
       )}
 
       {tab === 'funcionarios' && (
