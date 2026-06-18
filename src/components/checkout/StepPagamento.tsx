@@ -37,6 +37,9 @@ interface StepPagamentoProps {
   onBack: () => void
   onSubmit: () => Promise<void>
   loading: boolean
+  allowPix?: boolean
+  allowCard?: boolean
+  allowBoleto?: boolean
   result: {
     pixCode?: string
     pixQrCode?: string
@@ -94,6 +97,9 @@ export function StepPagamento({
   onSubmit,
   loading,
   result,
+  allowPix = true,
+  allowCard = true,
+  allowBoleto = true,
 }: StepPagamentoProps) {
   const [copied, setCopied] = useState(false)
 
@@ -297,23 +303,25 @@ export function StepPagamento({
       {/* Métodos de pagamento */}
       <div className="space-y-3">
         {/* Cartão */}
-        <label className={radioClass(data.paymentMethod === 'CARD')}>
-          <input
-            type="radio"
-            name="paymentMethod"
-            value="CARD"
-            checked={data.paymentMethod === 'CARD'}
-            onChange={() => onChange('paymentMethod', 'CARD')}
-            className="mt-0.5 accent-purple-600"
-          />
-          <div className="flex items-center gap-2">
-            <CreditCard size={18} className="text-gray-600 shrink-0" />
-            <span className="font-medium text-sm text-gray-900">Cartão de Crédito</span>
-          </div>
-        </label>
+        {allowCard && (
+          <label className={radioClass(data.paymentMethod === 'CARD')}>
+            <input
+              type="radio"
+              name="paymentMethod"
+              value="CARD"
+              checked={data.paymentMethod === 'CARD'}
+              onChange={() => onChange('paymentMethod', 'CARD')}
+              className="mt-0.5 accent-purple-600"
+            />
+            <div className="flex items-center gap-2">
+              <CreditCard size={18} className="text-gray-600 shrink-0" />
+              <span className="font-medium text-sm text-gray-900">Cartão de Crédito</span>
+            </div>
+          </label>
+        )}
 
         {/* Campos do cartão expandidos */}
-        {data.paymentMethod === 'CARD' && (
+        {allowCard && data.paymentMethod === 'CARD' && (
           <div className="bg-white border border-purple-200 rounded-xl px-4 pb-4 space-y-4 pt-4">
             {/* Preview do cartão */}
             <div className="relative bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-5 text-white overflow-hidden h-28 sm:h-36 select-none">
@@ -424,43 +432,47 @@ export function StepPagamento({
         )}
 
         {/* PIX */}
-        <label className={radioClass(data.paymentMethod === 'PIX')}>
-          <input
-            type="radio"
-            name="paymentMethod"
-            value="PIX"
-            checked={data.paymentMethod === 'PIX'}
-            onChange={() => onChange('paymentMethod', 'PIX')}
-            className="mt-0.5 accent-purple-600"
-          />
-          <div>
-            <div className="flex items-center gap-2">
-              <QrCode size={18} className="text-gray-600 shrink-0" />
-              <span className="font-medium text-sm text-gray-900">Pix à vista</span>
+        {allowPix && (
+          <label className={radioClass(data.paymentMethod === 'PIX')}>
+            <input
+              type="radio"
+              name="paymentMethod"
+              value="PIX"
+              checked={data.paymentMethod === 'PIX'}
+              onChange={() => onChange('paymentMethod', 'PIX')}
+              className="mt-0.5 accent-purple-600"
+            />
+            <div>
+              <div className="flex items-center gap-2">
+                <QrCode size={18} className="text-gray-600 shrink-0" />
+                <span className="font-medium text-sm text-gray-900">Pix à vista</span>
+              </div>
+              {data.paymentMethod === 'PIX' && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Ao confirmar, geramos um QR Code Pix de {formatCurrency(effectivePrice)} para pagamento imediato.
+                </p>
+              )}
             </div>
-            {data.paymentMethod === 'PIX' && (
-              <p className="text-xs text-gray-500 mt-1">
-                Ao confirmar, geramos um QR Code Pix de {formatCurrency(effectivePrice)} para pagamento imediato.
-              </p>
-            )}
-          </div>
-        </label>
+          </label>
+        )}
 
         {/* Boleto */}
-        <label className={radioClass(data.paymentMethod === 'BOLETO')}>
-          <input
-            type="radio"
-            name="paymentMethod"
-            value="BOLETO"
-            checked={data.paymentMethod === 'BOLETO'}
-            onChange={() => onChange('paymentMethod', 'BOLETO')}
-            className="mt-0.5 accent-purple-600"
-          />
-          <div className="flex items-center gap-2">
-            <Barcode size={18} className="text-gray-600 shrink-0" />
-            <span className="font-medium text-sm text-gray-900">Boleto à vista</span>
-          </div>
-        </label>
+        {allowBoleto && (
+          <label className={radioClass(data.paymentMethod === 'BOLETO')}>
+            <input
+              type="radio"
+              name="paymentMethod"
+              value="BOLETO"
+              checked={data.paymentMethod === 'BOLETO'}
+              onChange={() => onChange('paymentMethod', 'BOLETO')}
+              className="mt-0.5 accent-purple-600"
+            />
+            <div className="flex items-center gap-2">
+              <Barcode size={18} className="text-gray-600 shrink-0" />
+              <span className="font-medium text-sm text-gray-900">Boleto à vista</span>
+            </div>
+          </label>
+        )}
       </div>
 
       {/* CPF / CNPJ */}

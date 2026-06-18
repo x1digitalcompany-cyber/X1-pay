@@ -109,6 +109,16 @@ model Checkout {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  supplierCost    Float   @default(0)
+  shippingCost    Float   @default(0)
+  maxInstallments Int     @default(12)
+  installmentMode String  @default("table")
+  showTotalPrice  Boolean @default(true)
+  allowPix        Boolean @default(true)
+  allowCard       Boolean @default(true)
+  allowBoleto     Boolean @default(true)
+  badge           String?
+
   orders Order[]
 }
 

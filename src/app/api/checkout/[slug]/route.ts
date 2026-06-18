@@ -45,7 +45,11 @@ export async function GET(
     brandName: user.brandName,
     brandColor: user.brandColor,
     logoUrl: user.logoUrl,
-    maxInstallments: user.maxInstallments,
+    maxInstallments: checkout.maxInstallments ?? user.maxInstallments,
+    allowPix: checkout.allowPix,
+    allowCard: checkout.allowCard,
+    allowBoleto: checkout.allowBoleto,
+    badge: checkout.badge,
   })
 }
 

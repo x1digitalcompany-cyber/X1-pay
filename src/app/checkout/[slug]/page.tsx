@@ -16,6 +16,10 @@ interface CheckoutData {
   brandColor: string
   logoUrl?: string
   maxInstallments: number
+  allowPix: boolean
+  allowCard: boolean
+  allowBoleto: boolean
+  badge: string | null
   product: {
     name: string
     description?: string
@@ -374,6 +378,9 @@ export default function CheckoutPage() {
             onSubmit={handlePayment}
             loading={submitting}
             result={result}
+            allowPix={checkout.allowPix}
+            allowCard={checkout.allowCard}
+            allowBoleto={checkout.allowBoleto}
           />
         </div>
       ) : (
@@ -436,6 +443,9 @@ export default function CheckoutPage() {
                   onSubmit={handlePayment}
                   loading={submitting}
                   result={null}
+                  allowPix={checkout.allowPix}
+                  allowCard={checkout.allowCard}
+                  allowBoleto={checkout.allowBoleto}
                 />
               </AccordionStep>
             </div>

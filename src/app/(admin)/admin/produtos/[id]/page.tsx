@@ -1,8 +1,9 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import Link from 'next/link'
 import { toast } from 'sonner'
-import { ExternalLink, Copy, Trash2, Package, Loader2, X } from 'lucide-react'
+import { ExternalLink, Copy, Trash2, Package, Loader2, X, Pencil } from 'lucide-react'
 import { formatCurrency, generateSlug } from '@/lib/utils'
 
 interface Checkout {
@@ -109,10 +110,24 @@ export default function EditarProdutoPage() {
     toast.success('Kit adicionado — salve para confirmar')
   }
 
-  function removeCheckout(index: number) {
-    if (!form || !confirm('Remover este checkout?')) return
-    const checkouts = form.checkouts.filter((_, i) => i !== index)
-    setForm({ ...form, checkouts })
+  async function removeCheckout(checkoutId: string) {
+    if (!confirm('Remover este checkout?')) return
+    if (!checkoutId) {
+      // Kit ainda não salvo — remove apenas do estado local
+      setForm((prev) =>
+        prev ? { ...prev, checkouts: prev.checkouts.filter((c) => c.id !== checkoutId) } : prev
+      )
+      return
+    }
+    const res = await fetch(`/api/checkouts/${checkoutId}`, { method: 'DELETE' })
+    if (res.ok) {
+      setForm((prev) =>
+        prev ? { ...prev, checkouts: prev.checkouts.filter((c) => c.id !== checkoutId) } : prev
+      )
+      toast.success('Checkout removido')
+    } else {
+      toast.error('Erro ao remover checkout')
+    }
   }
 
   function copyLink(slug: string) {
@@ -205,88 +220,53 @@ export default function EditarProdutoPage() {
         {activeTab === 'checkouts' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <p className="text-sm text-gray-400">{form.checkouts.length} checkout(s)</p>
-              <button type="button" onClick={openKitModal} className="px-3 py-1.5 rounded-lg bg-purple-900/50 text-white text-sm">
+              <p className="text-sm text-gray-400">Cada kit gera um link de checkout próprio.</p>
+              <button type="button" onClick={openKitModal}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-purple-700 text-white text-sm">
                 + Novo kit
               </button>
             </div>
 
-            {form.checkouts.map((checkout, i) => (
-              <div key={checkout.id || i} className="bg-[#0f0a1e] rounded-lg p-4 space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <input
-                    className={inputClass}
-                    value={checkout.name}
-                    onChange={(e) => {
-                      const checkouts = [...form.checkouts]
-                      checkouts[i] = { ...checkout, name: e.target.value }
-                      update('checkouts', checkouts)
-                    }}
-                  />
-                  <div className="flex items-center gap-1 shrink-0">
-                    {checkout.slug && (
-                      <>
-                        <button type="button" onClick={() => copyLink(checkout.slug)} className="p-2 text-purple-400 hover:bg-purple-900/30 rounded" title="Copiar link">
-                          <Copy size={16} />
-                        </button>
-                        <a href={`/checkout/${checkout.slug}`} target="_blank" rel="noopener noreferrer" className="p-2 text-purple-400 hover:bg-purple-900/30 rounded">
-                          <ExternalLink size={16} />
-                        </a>
-                      </>
-                    )}
-                    <button type="button" onClick={() => removeCheckout(i)} className="p-2 text-red-400 hover:bg-red-900/30 rounded">
-                      <Trash2 size={16} />
-                    </button>
+            {form.checkouts.map((checkout) => (
+              <div key={checkout.id}
+                className="bg-[#0f0a1e] rounded-lg p-4 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-white font-medium truncate">{checkout.name}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${
+                      checkout.isActive ? 'bg-green-900/40 text-green-400' : 'bg-gray-800 text-gray-400'
+                    }`}>
+                      {checkout.isActive ? 'Ativa' : 'Inativa'}
+                    </span>
                   </div>
+                  <p className="text-xs text-gray-500 mt-0.5 truncate">/checkout/{checkout.slug}</p>
+                  <p className="text-sm text-purple-300 mt-0.5">{formatCurrency(checkout.price)}</p>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-xs text-gray-500">Slug</label>
-                    <input
-                      className={inputClass}
-                      value={checkout.slug}
-                      onChange={(e) => {
-                        const checkouts = [...form.checkouts]
-                        checkouts[i] = { ...checkout, slug: e.target.value }
-                        update('checkouts', checkouts)
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500">Preço (R$)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className={inputClass}
-                      value={checkout.price}
-                      onChange={(e) => {
-                        const checkouts = [...form.checkouts]
-                        checkouts[i] = { ...checkout, price: Number(e.target.value) }
-                        update('checkouts', checkouts)
-                      }}
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-500">{formatCurrency(checkout.price)}</span>
-                  <label className="flex items-center gap-2 text-sm text-gray-300">
-                    <input
-                      type="checkbox"
-                      checked={checkout.isActive}
-                      onChange={(e) => {
-                        const checkouts = [...form.checkouts]
-                        checkouts[i] = { ...checkout, isActive: e.target.checked }
-                        update('checkouts', checkouts)
-                      }}
-                    />
-                    Ativo
-                  </label>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button type="button" onClick={() => copyLink(checkout.slug)}
+                    className="p-2 text-gray-400 hover:text-purple-400 transition" title="Copiar link">
+                    <Copy size={16} />
+                  </button>
+                  <a href={`/checkout/${checkout.slug}`} target="_blank" rel="noopener noreferrer"
+                    className="p-2 text-gray-400 hover:text-purple-400 transition">
+                    <ExternalLink size={16} />
+                  </a>
+                  {checkout.id && (
+                    <Link href={`/admin/produtos/${id}/checkouts/${checkout.id}`}
+                      className="p-2 text-gray-400 hover:text-purple-400 transition" title="Editar oferta">
+                      <Pencil size={16} />
+                    </Link>
+                  )}
+                  <button type="button" onClick={() => removeCheckout(checkout.id)}
+                    className="p-2 text-gray-400 hover:text-red-400 transition">
+                    <Trash2 size={16} />
+                  </button>
                 </div>
               </div>
             ))}
 
             {form.checkouts.length === 0 && (
-              <p className="text-center text-gray-500 py-4">Nenhum checkout — crie um kit</p>
+              <p className="text-center text-gray-500 py-8">Nenhum checkout — crie um kit</p>
             )}
           </div>
         )}
