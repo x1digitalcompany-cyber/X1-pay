@@ -259,6 +259,10 @@ export async function POST(
       if (process.env.NODE_ENV !== 'production') {
         console.log('[Pagar.me] charge:', JSON.stringify(charge, null, 2))
         console.log('[Pagar.me] lastTransaction:', JSON.stringify(lastTransaction, null, 2))
+        if (paymentMethod === 'BOLETO') {
+          console.log('[Pagar.me] Boleto lastTransaction:', JSON.stringify(lastTransaction, null, 2))
+          console.log('[Pagar.me] Boleto charge completo:', JSON.stringify(charge, null, 2))
+        }
       }
 
       const updateData: Record<string, string | undefined> = {
@@ -271,8 +275,17 @@ export async function POST(
         updateData.pixQrCode = lastTransaction.qr_code_url
       }
       if (paymentMethod === 'BOLETO' && lastTransaction) {
-        updateData.boletoUrl = lastTransaction.pdf
-        updateData.boletoBarCode = lastTransaction.line
+        updateData.boletoUrl =
+          lastTransaction.url ||
+          lastTransaction.pdf ||
+          lastTransaction.boleto_url ||
+          charge?.boleto_url ||
+          undefined
+        updateData.boletoBarCode =
+          lastTransaction.line ||
+          lastTransaction.boleto_barcode ||
+          charge?.boleto_barcode ||
+          undefined
       }
       if (paymentMethod === 'CARD' && lastTransaction?.card) {
         updateData.cardBrand = lastTransaction.card.brand
