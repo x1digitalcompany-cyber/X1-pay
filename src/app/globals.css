@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand-color: #7c3aed;
+
+  /* Tema padrão (claro) para o admin/checkout */
+  --admin-bg: #f8fafc;
+  --admin-panel-bg: #ffffff;
+  --sidebar-bg: #ffffff;
+  --admin-text: #0f172a;
+  --admin-muted: #6b7280;
+  --admin-border: rgba(15, 23, 42, 0.12);
+
+  --scrollbar-track: #e5e7eb;
+  --scrollbar-thumb: #7c3aed;
+}
+
+.dark {
+  /* Tema escuro (admin) */
+  --admin-bg: #0f0a1e;
+  --admin-panel-bg: #1a1030;
+  --sidebar-bg: #13092a;
+  --admin-text: #e2e8f0;
+  --admin-muted: #9ca3af;
+  --admin-border: rgba(88, 28, 135, 0.35);
+
+  --scrollbar-track: #1a1030;
+  --scrollbar-thumb: #4c1d95;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--admin-bg);
+  color: var(--admin-text);
+  font-family: 'Inter', sans-serif;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 3px;
+}
+
+.gradient-brand {
+  background: linear-gradient(135deg, var(--brand-color) 0%, #5b21b6 100%);
+}

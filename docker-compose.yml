@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: x1pay
+      POSTGRES_PASSWORD: x1pay123
+      POSTGRES_DB: x1pay
+    ports:
+      - "5432:5432"
+    volumes:
+      - x1pay_pg:/var/lib/postgresql/data
+
+volumes:
+  x1pay_pg:

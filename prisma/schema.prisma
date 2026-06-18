@@ -1,0 +1,205 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  password        String
+  name            String
+  role            String   @default("ADMIN")
+  logoUrl         String?
+  brandName       String   @default("X1 Pay")
+  brandColor      String   @default("#7c3aed")
+  currency        String   @default("BRL")
+  defaultTax      Float    @default(0)
+  maxInstallments Int      @default(12)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  products  Product[]
+  orders    Order[]
+  sellers   Seller[]
+  settings  Settings?
+  employees Employee[]
+  coupons   Coupon[]
+}
+
+model Settings {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+
+  gateway          String  @default("pagarme")
+  pagarmeSecretKey String?
+  asaasApiKey      String?
+
+  taxPix        Float @default(0.69)
+  taxBoleto     Float @default(2.99)
+  taxGateway    Float @default(0.35)
+  taxAntifraude Float @default(0.35)
+  taxCard1x     Float @default(3.69)
+  taxCard2x     Float @default(5.19)
+  taxCard3x     Float @default(6.22)
+  taxCard4x     Float @default(7.25)
+  taxCard5x     Float @default(8.28)
+  taxCard6x     Float @default(9.31)
+  taxCard7x     Float @default(10.46)
+  taxCard8x     Float @default(11.49)
+  taxCard9x     Float @default(12.52)
+  taxCard10x    Float @default(13.55)
+  taxCard11x    Float @default(14.58)
+  taxCard12x    Float @default(15.61)
+
+  logisticsEnabled     Boolean @default(false)
+  logisticsProvider    String? @default("123log")
+  logisticsApiUrl      String?
+  logisticsApiKey      String?
+  logisticsOrigin      String?
+  logisticsPostbackKey String?
+
+  luminarTrackUrl String?
+  monthlyGoal     Float   @default(0)
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  name        String
+  description String?
+  category    String?
+  type        String   @default("Cápsula")
+  unitCost    Float    @default(0)
+  logisticsId String?
+  imageUrl    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  checkouts Checkout[]
+}
+
+model Checkout {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String
+  slug      String   @unique
+  price     Float
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[]
+}
+
+model Order {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  checkoutId String?
+  checkout   Checkout? @relation(fields: [checkoutId], references: [id])
+  sellerId   String?
+  seller     Seller?   @relation(fields: [sellerId], references: [id])
+
+  offerName     String
+  value         Float
+  status        String  @default("PENDING")
+  paymentMethod String  @default("PIX")
+  installments  Int     @default(1)
+  netValue      Float   @default(0)
+  directPayment Boolean @default(false)
+
+  customerName  String
+  customerEmail String?
+  customerPhone String?
+  customerCpf   String?
+
+  zipCode      String?
+  street       String?
+  number       String?
+  complement   String?
+  neighborhood String?
+  city         String?
+  state        String?
+
+  trackingCode String?
+  trackingUrl  String?
+
+  gatewayId      String?
+  gatewayStatus  String?
+  pixCode        String?
+  pixQrCode      String?
+  boletoUrl      String?
+  boletoBarCode  String?
+  cardBrand      String?
+  cardLastDigits String?
+
+  couponCode     String?
+  discountAmount Float   @default(0)
+
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Seller {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  name       String
+  email      String?
+  phone      String?
+  commission Float    @default(0)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  orders Order[]
+}
+
+model Employee {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  name      String
+  email     String   @unique
+  password  String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Coupon {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  code          String
+  type          String    @default("PERCENTAGE")
+  value         Float
+  minOrderValue Float     @default(0)
+  maxUses       Int?
+  usedCount     Int       @default(0)
+  isActive      Boolean   @default(true)
+  expiresAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([userId, code])
+}
+
+model AbandonedCart {
+  id           String   @id @default(cuid())
+  checkoutSlug String
+  name         String?
+  email        String?
+  phone        String?
+  createdAt    DateTime @default(now())
+}
