@@ -222,6 +222,7 @@ export default function CheckoutPage() {
   const { slug } = useParams<{ slug: string }>()
   const searchParams = useSearchParams()
   const sellerId = searchParams.get('seller') || searchParams.get('src') || undefined
+  const cartSrc = searchParams.get('src') || undefined
 
   const [checkout, setCheckout] = useState<CheckoutData | null>(null)
   const [step, setStep] = useState(1)
@@ -400,6 +401,7 @@ export default function CheckoutPage() {
               >
                 <StepDadosPessoais
                   checkoutSlug={slug}
+                  src={cartSrc}
                   data={form}
                   onChange={updateForm}
                   onNext={() => setStep(2)}

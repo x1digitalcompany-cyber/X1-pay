@@ -230,6 +230,7 @@ model AbandonedCart {
   name         String?
   email        String?
   phone        String?
+  src          String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

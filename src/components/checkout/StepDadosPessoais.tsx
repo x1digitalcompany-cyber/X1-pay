@@ -4,6 +4,7 @@ import { maskPhone } from '@/lib/utils'
 
 interface StepDadosPessoaisProps {
   checkoutSlug: string
+  src?: string
   data: {
     customerName: string
     customerEmail: string
@@ -13,7 +14,7 @@ interface StepDadosPessoaisProps {
   onNext: () => void
 }
 
-export function StepDadosPessoais({ checkoutSlug, data, onChange, onNext }: StepDadosPessoaisProps) {
+export function StepDadosPessoais({ checkoutSlug, src, data, onChange, onNext }: StepDadosPessoaisProps) {
   const [noEmail, setNoEmail] = useState(false)
 
   const labelClass = 'block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1'
@@ -31,6 +32,7 @@ export function StepDadosPessoais({ checkoutSlug, data, onChange, onNext }: Step
           name: data.customerName,
           email: data.customerEmail,
           phone: data.customerPhone,
+          src,
         }),
       }).catch(() => {})
     }

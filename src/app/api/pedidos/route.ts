@@ -4,6 +4,8 @@ import { authOptions, getAdminUserId } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { startOfDay, endOfDay } from 'date-fns'
 
+const PAGE_SIZE = 20
+
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   const userId = getAdminUserId(session!)
@@ -18,43 +20,78 @@ export async function GET(req: NextRequest) {
   const search = searchParams.get('search')
   const minValue = searchParams.get('minValue')
   const maxValue = searchParams.get('maxValue')
+  const tracking = searchParams.get('tracking') // 'with' | 'without'
+  const src = searchParams.get('src')
+  const dateField = searchParams.get('dateField') || 'createdAt'
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
 
-  const where: Record<string, unknown> = { userId }
+  const andConditions: Record<string, unknown>[] = [{ userId }]
 
   if (status) {
     const statuses = status.split(',').filter(Boolean)
-    if (statuses.length) where.status = { in: statuses }
+    if (statuses.length) andConditions.push({ status: { in: statuses } })
   }
-  if (paymentMethod) where.paymentMethod = paymentMethod
-  if (sellerId) where.sellerId = sellerId
+  if (paymentMethod) andConditions.push({ paymentMethod })
+  if (sellerId) andConditions.push({ sellerId })
+
   if (from || to) {
-    const createdAt: Record<string, Date> = {}
-    if (from) createdAt.gte = startOfDay(new Date(from))
-    if (to) createdAt.lte = endOfDay(new Date(to))
-    where.createdAt = createdAt
+    const dateFilter: Record<string, Date> = {}
+    if (from) dateFilter.gte = startOfDay(new Date(from))
+    if (to) dateFilter.lte = endOfDay(new Date(to))
+    andConditions.push({ [dateField === 'paidAt' ? 'paidAt' : 'createdAt']: dateFilter })
   }
+
   if (search) {
-    where.OR = [
-      { customerName: { contains: search } },
-      { customerEmail: { contains: search } },
-      { customerPhone: { contains: search } },
-      { offerName: { contains: search } },
-    ]
+    andConditions.push({
+      OR: [
+        { customerName: { contains: search } },
+        { customerEmail: { contains: search } },
+        { customerPhone: { contains: search } },
+        { offerName: { contains: search } },
+      ],
+    })
   }
+
   if (minValue || maxValue) {
     const value: Record<string, number> = {}
     if (minValue) value.gte = Number(minValue)
     if (maxValue) value.lte = Number(maxValue)
-    where.value = value
+    andConditions.push({ value })
   }
 
-  const orders = await prisma.order.findMany({
-    where,
-    include: { seller: true, checkout: true },
-    orderBy: { createdAt: 'desc' },
-  })
+  if (tracking === 'with') andConditions.push({ trackingCode: { not: null } })
+  if (tracking === 'without') andConditions.push({ trackingCode: null })
 
-  return NextResponse.json(orders)
+  if (src) {
+    const matchingSellers = await prisma.seller.findMany({
+      where: { userId, name: { contains: src } },
+      select: { id: true },
+    })
+    if (matchingSellers.length === 0) {
+      return NextResponse.json({ orders: [], total: 0, page, pages: 0 })
+    }
+    andConditions.push({ sellerId: { in: matchingSellers.map((s) => s.id) } })
+  }
+
+  const where = andConditions.length === 1 ? andConditions[0] : { AND: andConditions }
+
+  const [orders, total] = await prisma.$transaction([
+    prisma.order.findMany({
+      where,
+      include: { seller: true, checkout: true },
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+    prisma.order.count({ where }),
+  ])
+
+  return NextResponse.json({
+    orders,
+    total,
+    page,
+    pages: Math.ceil(total / PAGE_SIZE),
+  })
 }
 
 export async function POST(req: NextRequest) {

@@ -188,6 +188,7 @@ export default function PedidoDetailPage() {
   const [trackingUrl, setTrackingUrl] = useState('')
   const [saving, setSaving] = useState(false)
   const [sendingLogistics, setSendingLogistics] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const [refundOpen, setRefundOpen] = useState(false)
   const [refundNote, setRefundNote] = useState('')
   const [refunding, setRefunding] = useState(false)
@@ -264,6 +265,24 @@ export default function PedidoDetailPage() {
       toast.success('Reembolso registrado')
     } else {
       toast.error('Erro ao solicitar reembolso')
+    }
+  }
+
+  async function syncWithGateway() {
+    setSyncing(true)
+    try {
+      const res = await fetch(`/api/pedidos/${id}/sync`, { method: 'POST' })
+      const data = await res.json()
+      if (res.ok) {
+        setOrder((prev) => (prev ? { ...prev, ...data } : prev))
+        toast.success('Pedido sincronizado com o gateway!')
+      } else {
+        toast.error(data.error || 'Erro ao sincronizar')
+      }
+    } catch {
+      toast.error('Erro ao sincronizar com o gateway')
+    } finally {
+      setSyncing(false)
     }
   }
 
@@ -515,8 +534,20 @@ export default function PedidoDetailPage() {
         {/* Pagamento */}
         {(order.gatewayId || order.pixCode || order.boletoUrl) && (
           <div className={sectionClass}>
-            <div className="flex items-center gap-2 text-[var(--admin-text)] font-semibold">
-              <CreditCard size={16} className="text-purple-400" /> Pagamento
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-[var(--admin-text)] font-semibold">
+                <CreditCard size={16} className="text-purple-400" /> Pagamento
+              </div>
+              {order.gatewayId && (
+                <button
+                  onClick={syncWithGateway}
+                  disabled={syncing}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-purple-700 text-purple-300 text-xs hover:bg-purple-900/20 transition disabled:opacity-50"
+                >
+                  <RotateCcw size={13} className={syncing ? 'animate-spin' : ''} />
+                  {syncing ? 'Sincronizando...' : 'Sincronizar'}
+                </button>
+              )}
             </div>
             <div className="space-y-3">
               <Field label="ID Gateway" value={order.gatewayId} />
