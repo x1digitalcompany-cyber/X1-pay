@@ -357,105 +357,102 @@ export default function CheckoutPage() {
       </header>
 
       {/* Conteúdo */}
-      <div className="max-w-5xl mx-auto px-4 py-6">
-        {/* Mobile: sidebar topo · Desktop: sidebar direita (flex-col-reverse inverte no mobile) */}
-        <div className="flex flex-col-reverse lg:flex-row gap-6">
+      {result ? (
+        /* Tela de resultado — sem sidebar, centralizado */
+        <div className="max-w-lg mx-auto px-4 py-10">
+          <StepPagamento
+            slug={slug}
+            price={checkout.price}
+            maxInstallments={checkout.maxInstallments}
+            brandColor={checkout.brandColor}
+            data={form}
+            appliedCoupon={appliedCoupon}
+            onCouponApply={setAppliedCoupon}
+            onCouponRemove={() => setAppliedCoupon(null)}
+            onChange={updateForm}
+            onBack={() => setStep(2)}
+            onSubmit={handlePayment}
+            loading={submitting}
+            result={result}
+          />
+        </div>
+      ) : (
+        /* Layout normal — accordion + sidebar */
+        <div className="max-w-5xl mx-auto px-4 py-6">
+          <div className="flex flex-col-reverse lg:flex-row gap-6">
 
-          {/* Coluna esquerda — Accordion */}
-          <div className="flex-1 space-y-3">
+            {/* Coluna esquerda — Accordion */}
+            <div className="flex-1 space-y-3">
+              <AccordionStep
+                numero={1}
+                titulo="Dados Pessoais"
+                concluido={step > 1}
+                ativo={step === 1}
+                resumo={resumoStep1}
+                onEdit={() => setStep(1)}
+              >
+                <StepDadosPessoais
+                  checkoutSlug={slug}
+                  data={form}
+                  onChange={updateForm}
+                  onNext={() => setStep(2)}
+                />
+              </AccordionStep>
 
-            {/* Tela de resultado (PIX/Boleto/Confirmado) — sobrepõe o accordion */}
-            {result && (
-              <StepPagamento
-                slug={slug}
-                price={checkout.price}
-                maxInstallments={checkout.maxInstallments}
-                brandColor={checkout.brandColor}
-                data={form}
+              <AccordionStep
+                numero={2}
+                titulo="Entrega"
+                concluido={step > 2}
+                ativo={step === 2}
+                resumo={resumoStep2}
+                onEdit={() => setStep(2)}
+              >
+                <StepEntrega
+                  data={form}
+                  onChange={updateForm}
+                  onNext={() => setStep(3)}
+                  onBack={() => setStep(1)}
+                />
+              </AccordionStep>
+
+              <AccordionStep
+                numero={3}
+                titulo="Pagamento"
+                concluido={false}
+                ativo={step === 3}
+                resumo={null}
+              >
+                <StepPagamento
+                  slug={slug}
+                  price={checkout.price}
+                  maxInstallments={checkout.maxInstallments}
+                  brandColor={checkout.brandColor}
+                  data={form}
+                  appliedCoupon={appliedCoupon}
+                  onCouponApply={setAppliedCoupon}
+                  onCouponRemove={() => setAppliedCoupon(null)}
+                  onChange={updateForm}
+                  onBack={() => setStep(2)}
+                  onSubmit={handlePayment}
+                  loading={submitting}
+                  result={null}
+                />
+              </AccordionStep>
+            </div>
+
+            {/* Coluna direita — Sidebar */}
+            <div className="w-full lg:w-80 shrink-0">
+              <SidebarResumo
+                checkout={checkout}
                 appliedCoupon={appliedCoupon}
                 onCouponApply={setAppliedCoupon}
                 onCouponRemove={() => setAppliedCoupon(null)}
-                onChange={updateForm}
-                onBack={() => setStep(2)}
-                onSubmit={handlePayment}
-                loading={submitting}
-                result={result}
+                slug={slug}
               />
-            )}
-
-            {!result && (
-              <>
-                <AccordionStep
-                  numero={1}
-                  titulo="Dados Pessoais"
-                  concluido={step > 1}
-                  ativo={step === 1}
-                  resumo={resumoStep1}
-                  onEdit={() => setStep(1)}
-                >
-                  <StepDadosPessoais
-                    checkoutSlug={slug}
-                    data={form}
-                    onChange={updateForm}
-                    onNext={() => setStep(2)}
-                  />
-                </AccordionStep>
-
-                <AccordionStep
-                  numero={2}
-                  titulo="Entrega"
-                  concluido={step > 2}
-                  ativo={step === 2}
-                  resumo={resumoStep2}
-                  onEdit={() => setStep(2)}
-                >
-                  <StepEntrega
-                    data={form}
-                    onChange={updateForm}
-                    onNext={() => setStep(3)}
-                    onBack={() => setStep(1)}
-                  />
-                </AccordionStep>
-
-                <AccordionStep
-                  numero={3}
-                  titulo="Pagamento"
-                  concluido={false}
-                  ativo={step === 3}
-                  resumo={null}
-                >
-                  <StepPagamento
-                    slug={slug}
-                    price={checkout.price}
-                    maxInstallments={checkout.maxInstallments}
-                    brandColor={checkout.brandColor}
-                    data={form}
-                    appliedCoupon={appliedCoupon}
-                    onCouponApply={setAppliedCoupon}
-                    onCouponRemove={() => setAppliedCoupon(null)}
-                    onChange={updateForm}
-                    onBack={() => setStep(2)}
-                    onSubmit={handlePayment}
-                    loading={submitting}
-                    result={null}
-                  />
-                </AccordionStep>
-              </>
-            )}
-          </div>
-
-          {/* Coluna direita — Sidebar */}
-          <div className="w-full lg:w-80 shrink-0">
-            <SidebarResumo
-              checkout={checkout}
-              appliedCoupon={appliedCoupon}
-              onCouponApply={setAppliedCoupon}
-              onCouponRemove={() => setAppliedCoupon(null)}
-              slug={slug}
-            />
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Footer */}
       <footer className="text-center py-6 text-xs text-gray-400 space-y-1">
